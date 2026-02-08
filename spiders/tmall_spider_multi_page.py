@@ -41,52 +41,66 @@ AS'''
 def check_and_solve_slider():
     """检查并解决滑块验证"""
     js_check = '''var slider = document.querySelector('.nc_wrapper, .nc_iconfont.btn_slide, [class*="slide"], [class*="slider"]');
-var sliderBtn = document.querySelector('#nc_1_n1z, .tcaptcha-slide-btn');
-JSON.stringify({hasSlider: !!slider || !!sliderBtn});'''
+JSON.stringify({hasSlider: !!slider});'''
     
     result = run_js(js_check)
     
     try:
         data = json.loads(result) if result else {}
         if data.get('hasSlider'):
-            print("      ⚠️ 检测到滑块验证！尝试解决...")
-            
-            # 模拟滑块拖动
-            js_drag = '''var btn = document.querySelector('#nc_1_n1z');
-if(btn) {
-    var x = btn.getBoundingClientRect().left;
-    var y = btn.getBoundingClientRect().top;
-    var width = btn.offsetWidth;
-    var targetX = x + width - 20;
-    
-    // 模拟人类拖动轨迹
-    var path = [];
-    var currentX = x;
-    while(currentX < targetX) {
-        var step = Math.random() * 15 + 5;
-        currentX += step;
-        path.push({x: currentX, y: y + Math.random() * 10});
-    }
-    
-    JSON.stringify({success: true, pathLength: path.length});
-} else {
-    JSON.stringify({success: false, msg: 'Slider button not found'});
-}'''
-            
-            result2 = run_js(js_drag)
-            print(f"      滑块模拟结果: {result2}")
-            time.sleep(3)
-    except Exception as e:
-        print(f"      滑块检查失败: {e}")
+            print("      ⚠️ 检测到滑块验证！")
+            time.sleep(5)  # 等待用户手动解决
+    except:
+        pass
 
 
 def scroll_to_bottom():
-    """滚动到底部"""
-    js = 'window.scrollTo(0, document.body.scrollHeight)'
-    run_js(js)
-    time.sleep(2)
-    run_js(js)
-    time.sleep(2)
+    """小步滚动到底部，每次间隔2秒"""
+    max_scrolls = 50  # 最多滚动50次
+    scroll_count = 0
+    last_height = 0
+    
+    while scroll_count < max_scrolls:
+        # 获取当前滚动位置和页面高度
+        js = '''var h = {
+    scrollTop: document.documentElement.scrollTop || document.body.scrollTop,
+    scrollHeight: document.documentElement.scrollHeight || document.body.scrollHeight,
+    clientHeight: document.documentElement.clientHeight || document.body.clientHeight
+};
+JSON.stringify(h);'''
+        
+        result = run_js(js)
+        
+        try:
+            data = json.loads(result) if result else {}
+            current_scroll = data.get('scrollTop', 0)
+            scroll_height = data.get('scrollHeight', 0)
+            client_height = data.get('clientHeight', 0)
+            
+            # 判断是否到底
+            if current_scroll + client_height >= scroll_height - 10:
+                print(f"      ✅ 滚动到底部 (第{scroll_count}次)")
+                break
+            
+            # 小步滚动
+            js_scroll = 'window.scrollBy(0, 300)'
+            run_js(js_scroll)
+            
+            scroll_count += 1
+            time.sleep(2)  # 每次间隔2秒
+            
+            # 如果滚动位置没变化，也停止
+            if current_scroll == last_height:
+                print(f"      ⏹️ 滚动位置无变化，停止 (第{scroll_count}次)")
+                break
+            
+            last_height = current_scroll
+            
+        except Exception as e:
+            print(f"      ⚠️ 滚动出错: {e}")
+            break
+    
+    time.sleep(3)
 
 
 def get_products_from_page():
@@ -162,7 +176,7 @@ JSON.stringify({isPreSale: text.includes("预售") || text.includes("新品"), t
     js_price = '''var priceElem = document.querySelector('.text--LP7Wf49z');
 var priceText = priceElem ? priceElem.innerText : "";
 var price = parseFloat(priceText.replace(/[^0-9.]/g, '')) || 0;
-JSON.stringify({price: price, raw: priceText});'''
+JSON.stringify({price: price});'''
     
     result2 = run_js(js_price)
     
