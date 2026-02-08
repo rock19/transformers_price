@@ -1,0 +1,12 @@
+[
+  {"domain": ".tmall.com", "hostOnly": false, "httpOnly": false, "name": "_l_g_", "path": "/", "sameSite": "no_restriction", "secure": true, "session": true, "value": "Ug%3D%3D"},
+  {"domain": ".tmall.com", "hostOnly": false, "httpOnly": false, "name": "_nk_", "path": "/", "sameSite": "no_restriction", "secure": true, "session": true, "value": "zy90221"},
+  {"domain": ".tmall.com", "hostOnly": false, "httpOnly": false, "name": "_tb_token_", "path": "/", "sameSite": "no_restriction", "secure": true, "session": true, "value": "34880d48e6ee5"},
+  {"domain": ".tmall.com", "hostOnly": false, "httpOnly": false, "name": "login", "path": "/", "sameSite": "no_restriction", "secure": true, "session": true, "value": "true"},
+  {"domain": ".tmall.com", "expirationDate": 1773172673.189071, "hostOnly": false, "httpOnly": true, "name": "wk_cookie2", "path": "/", "sameSite": "no_restriction", "secure": true, "session": false, "value": "14bd551ff3c99e67dc48e39a4e498be7"},
+  {"domain": ".tmall.com", "expirationDate": 1786103872, "hostOnly": false, "httpOnly": false, "name": "isg", "path": "/", "sameSite": "no_restriction", "secure": true, "session": false, "value": "BKurfkTiRnpTTZoud0X3mWr9OsmVwL9CZhJ2Mh0oh-pBvMsepZBPkkmfFvzSnBc6"},
+  {"domain": ".tmall.com", "hostOnly": false, "httpOnly": true, "name": "cookie1", "path": "/", "sameSite": "no_restriction", "secure": true, "session": true, "value": "VvuCxYvyNg7uOqbTPSS%2B81HalIMblg9Upe6CQ5xVd5I%3D"},
+  {"domain": ".tmall.com", "hostOnly": false, "httpOnly": true, "name": "cookie2", "path": "/", "sameSite": "no_restriction", "secure": true, "session": true, "value": "1378fdc20ca8919da6d71902267478dc"},
+  {"domain": ".tmall.com", "hostOnly": false, "httpOnly": false, "name": "tracknick", "path": "/", "sameSite": "no_restriction", "secure": true, "session": true, "value": "zy90221"},
+  {"domain": ".tmall.com", "hostOnly": false, "httpOnly": false, "name": "cna", "path": "/", "expirationDate": 1805111872.371995, "sameSite": "no_restriction", "secure": true, "session": false, "value": "IGgPIpOWdS0BASQHzcAnMqwi"}
+]
