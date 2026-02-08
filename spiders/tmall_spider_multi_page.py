@@ -56,9 +56,8 @@ JSON.stringify({hasSlider: !!slider});'''
 
 def scroll_to_bottom():
     """小步滚动到底部，每次间隔2秒"""
-    max_scrolls = 50  # 最多滚动50次
+    max_scrolls = 100  # 最多滚动100次
     scroll_count = 0
-    last_height = 0
     
     while scroll_count < max_scrolls:
         # 获取当前滚动位置和页面高度
@@ -78,27 +77,23 @@ JSON.stringify(h);'''
             client_height = data.get('clientHeight', 0)
             
             # 判断是否到底
-            if current_scroll + client_height >= scroll_height - 10:
+            if current_scroll + client_height >= scroll_height - 50:
                 print(f"      ✅ 滚动到底部 (第{scroll_count}次)")
                 break
             
             # 小步滚动
-            js_scroll = 'window.scrollBy(0, 300)'
+            js_scroll = 'window.scrollBy(0, 400)'
             run_js(js_scroll)
             
             scroll_count += 1
             time.sleep(2)  # 每次间隔2秒
             
-            # 如果滚动位置没变化，也停止
-            if current_scroll == last_height:
-                print(f"      ⏹️ 滚动位置无变化，停止 (第{scroll_count}次)")
-                break
-            
-            last_height = current_scroll
-            
         except Exception as e:
             print(f"      ⚠️ 滚动出错: {e}")
             break
+    
+    if scroll_count >= max_scrolls:
+        print(f"      ⚠️ 达到最大滚动次数 ({max_scrolls})")
     
     time.sleep(3)
 
