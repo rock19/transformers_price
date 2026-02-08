@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformers 价格追踪系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* 顶部标题 */
+        .header {
+            text-align: center;
+            padding: 30px 0;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        
+        /* 功能入口 */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .feature-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: #667eea;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+        
+        .feature-card.active {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.2);
+        }
+        
+        .feature-card .icon {
+            font-size: 2.5em;
+            margin-bottom: 12px;
+        }
+        
+        .feature-card h3 {
+            font-size: 1.1em;
+            margin-bottom: 6px;
+        }
+        
+        .feature-card p {
+            font-size: 0.85em;
+            opacity: 0.7;
+        }
+        
+        /* 内容展示区 */
+        .content {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 25px;
+            min-height: 500px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .content-title {
+            font-size: 1.4em;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        /* 搜索框 */
+        .search-box {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .search-box input {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 10px;
+            padding: 10px 15px;
+            color: #fff;
+            width: 250px;
+        }
+        
+        .search-box input::placeholder {
+            color: rgba(255,255,255,0.5);
+        }
+        
+        /* 商品表格 */
+        .price-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .price-table th,
+        .price-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            vertical-align: middle;
+        }
+        
+        .price-table th {
+            background: rgba(102, 126, 234, 0.15);
+            font-weight: 600;
+            font-size: 0.9em;
+            color: rgba(255,255,255,0.8);
+        }
+        
+        .price-table tr:hover {
+            background: rgba(255,255,255,0.03);
+        }
+        
+        /* 产品图片 */
+        .product-img {
+            width: 60px;
+            height: 60px;
+            border-radius: 10px;
+            object-fit: cover;
+            background: rgba(255,255,255,0.1);
+        }
+        
+        /* 款式名称 */
+        .style-name {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .style-name a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .style-name a:hover {
+            text-decoration: underline;
+        }
+        
+        /* New 标签 */
+        .new-badge {
+            display: inline-block;
+            background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            margin-right: 5px;
+            animation: pulse 1.5s infinite;
+            font-weight: bold;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+        
+        /* 价格 */
+        .price {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 1.1em;
+        }
+        
+        .price-30d {
+            color: #4ade80;
+        }
+        
+        .price-min {
+            color: #fbbf24;
+        }
+        
+        .price-tooltip {
+            position: relative;
+            cursor: help;
+        }
+        
+        .price-tooltip::after {
+            content: attr(data-date);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8em;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        
+        .price-tooltip:hover::after {
+            opacity: 1;
+        }
+        
+        /* 状态标签 */
+        .status {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85em;
+        }
+        
+        .status-available {
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+        
+        /* 响应式 */
+        @media (max-width: 1200px) {
+            .features {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+            
+            .content-header {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .price-table {
+                font-size: 0.85em;
+            }
+            
+            .product-img {
+                width: 40px;
+                height: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部标题 -->
+        <div class="header">
+            <h1>🤖 Transformers 价格追踪系统</h1>
+            <p>实时监控京东、天猫商品价格变化</p>
+        </div>
+        
+        <!-- 功能入口 -->
+        <div class="features">
+            <div class="feature-card active" onclick="switchTab('jd')">
+                <div class="icon">🛒</div>
+                <h3>京东价格</h3>
+                <p id="jd-count">加载中...</p>
+            </div>
+            <div class="feature-card" onclick="switchTab('tmall')">
+                <div class="icon">🏪</div>
+                <h3>天猫价格</h3>
+                <p id="tmall-count">加载中...</p>
+            </div>
+            <div class="feature-card" onclick="switchTab('maintain')">
+                <div class="icon">📦</div>
+                <h3>商品维护</h3>
+                <p>添加/编辑商品</p>
+            </div>
+            <div class="feature-card" onclick="switchTab('trend')">
+                <div class="icon">📈</div>
+                <h3>价格走势</h3>
+                <p>历史趋势分析</p>
+            </div>
+        </div>
+        
+        <!-- 内容展示区 -->
+        <div class="content">
+            <div class="content-header">
+                <div class="content-title">
+                    <span id="content-icon">🛒</span>
+                    <span id="content-title">京东价格列表</span>
+                </div>
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="搜索商品名称或ID..." oninput="filterProducts()">
+                </div>
+            </div>
+            
+            <!-- 表格 -->
+            <table class="price-table">
+                <thead>
+                    <tr>
+                        <th style="width: 80px;">图片</th>
+                        <th>款式名称</th>
+                        <th>产品标题</th>
+                        <th>创建时间</th>
+                        <th>店面名称</th>
+                        <th>30日最低</th>
+                        <th>最新价格</th>
+                        <th>历史最低</th>
+                    </tr>
+                </thead>
+                <tbody id="product-list">
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 50px; opacity: 0.6;">
+                            加载中...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        let currentTab = 'jd';
+        let allProducts = [];
+        
+        // 切换标签
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // 更新选中状态
+            document.querySelectorAll('.feature-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            
+            // 更新标题
+            const titles = {
+                'jd': { icon: '🛒', text: '京东价格列表' },
+                'tmall': { icon: '🏪', text: '天猫价格列表' },
+                'maintain': { icon: '📦', text: '商品维护' },
+                'trend': { icon: '📈', text: '价格走势分析' }
+            };
+            
+            document.getElementById('content-icon').textContent = titles[tab].icon;
+            document.getElementById('content-title').textContent = titles[tab].text;
+            
+            // 加载数据
+            loadProducts(tab);
+        }
+        
+        // 加载商品数据
+        async function loadProducts(tab) {
+            const tbody = document.getElementById('product-list');
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 50px;">加载中...</td></tr>';
+            
+            try {
+                if (tab === 'jd') {
+                    const res = await fetch('/api/jd-prices');
+                    allProducts = await res.json();
+                    renderProducts(allProducts);
+                    document.getElementById('jd-count').textContent = allProducts.length + ' 个商品';
+                } else if (tab === 'tmall') {
+                    const res = await fetch('/api/tmall-prices');
+                    allProducts = await res.json();
+                    renderProducts(allProducts);
+                    document.getElementById('tmall-count').textContent = allProducts.length + ' 个商品';
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 50px;">功能开发中...</td></tr>';
+                }
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 50px; color: #f5576c;">加载失败: ' + e.message + '</td></tr>';
+            }
+        }
+        
+        // 渲染商品列表
+        function renderProducts(products) {
+            const tbody = document.getElementById('product-list');
+            
+            if (products.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 50px; opacity: 0.6;">暂无数据</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = products.map(p => {
+                // New 标签
+                const newBadge = p.is_new ? '<span class="new-badge">NEW</span>' : '';
+                
+                // 价格
+                const latestPrice = p.latest_price ? '¥' + p.latest_price.toFixed(2) : '-';
+                const min30dPrice = p.min_price_30d ? '¥' + p.min_price_30d.toFixed(2) : '-';
+                const minAllPrice = p.min_price_all ? '¥' + p.min_price_all.toFixed(2) : '-';
+                
+                // 图片
+                const imgUrl = p.image_url || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60"><rect fill="%23333" width="60" height="60"/><text fill="%23666" x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="20">?</text></svg>';
+                
+                // 格式化日期
+                const createdAt = p.created_at ? p.created_at.substring(0, 10) : '-';
+                
+                return `
+                    <tr>
+                        <td><img src="${imgUrl}" class="product-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22><rect fill=%22%23333%22 width=%2260%22 height=%2260%22/><text fill=%22%23666%22 x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22>?</text></svg>'"></td>
+                        <td class="style-name">
+                            ${newBadge}
+                            <a href="${p.product_url}" target="_blank" title="${p.style_name}">${p.style_name || '-'}</a>
+                        </td>
+                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${p.title}">${p.title || '-'}</td>
+                        <td>${createdAt}</td>
+                        <td>${p.shop_name || '-'}</td>
+                        <td class="price price-30d">${min30dPrice}</td>
+                        <td class="price price-tooltip" data-date="${p.latest_date || ''}">${latestPrice}</td>
+                        <td class="price price-min">${minAllPrice}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        // 搜索过滤
+        function filterProducts() {
+            const keyword = document.getElementById('search-input').value.toLowerCase();
+            
+            if (!keyword) {
+                renderProducts(allProducts);
+                return;
+            }
+            
+            const filtered = allProducts.filter(p => {
+                return (p.style_name && p.style_name.toLowerCase().includes(keyword)) ||
+                       (p.title && p.title.toLowerCase().includes(keyword)) ||
+                       (p.product_id && p.product_id.toLowerCase().includes(keyword));
+            });
+            
+            renderProducts(filtered);
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadProducts('jd');
+        });
+    </script>
+</body>
+</html>
