@@ -1,0 +1,30 @@
+# 变形金刚比价程序依赖
+
+# Web框架
+Flask==3.0.0
+Werkzeug==3.0.1
+
+# 数据库
+SQLAlchemy==2.0.23
+
+# 爬虫
+requests==2.31.0
+beautifulsoup4==4.12.2
+selenium==4.15.2
+lxml==4.9.3
+
+# 数据处理
+pandas==2.1.3
+
+# 定时任务
+APScheduler==3.10.4
+
+# OCR（可选，用于商品匹配）
+pytesseract==0.3.10
+Pillow==10.1.0
+
+# HTTP客户端（用于飞书通知）
+httpx==0.25.2
+
+# 图表
+Chart.js==4.4.0
