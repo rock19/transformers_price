@@ -38,22 +38,60 @@ AS'''
     return result.stdout.strip()
 
 
-def scroll_page():
-    """滚动到底部加载所有商品"""
-    # 先滚动到底部
-    js = 'window.scrollTo(0, document.body.scrollHeight)'
-    run_js(js)
-    time.sleep(3)
+def check_and_solve_slider():
+    """检查并解决滑块验证"""
+    js_check = '''var slider = document.querySelector('.nc_wrapper, .nc_iconfont.btn_slide, [class*="slide"], [class*="slider"]');
+var sliderBtn = document.querySelector('#nc_1_n1z, .tcaptcha-slide-btn');
+JSON.stringify({hasSlider: !!slider || !!sliderBtn});'''
     
-    # 再滚动到底部（确保加载完成）
+    result = run_js(js_check)
+    
+    try:
+        data = json.loads(result) if result else {}
+        if data.get('hasSlider'):
+            print("      ⚠️ 检测到滑块验证！尝试解决...")
+            
+            # 模拟滑块拖动
+            js_drag = '''var btn = document.querySelector('#nc_1_n1z');
+if(btn) {
+    var x = btn.getBoundingClientRect().left;
+    var y = btn.getBoundingClientRect().top;
+    var width = btn.offsetWidth;
+    var targetX = x + width - 20;
+    
+    // 模拟人类拖动轨迹
+    var path = [];
+    var currentX = x;
+    while(currentX < targetX) {
+        var step = Math.random() * 15 + 5;
+        currentX += step;
+        path.push({x: currentX, y: y + Math.random() * 10});
+    }
+    
+    JSON.stringify({success: true, pathLength: path.length});
+} else {
+    JSON.stringify({success: false, msg: 'Slider button not found'});
+}'''
+            
+            result2 = run_js(js_drag)
+            print(f"      滑块模拟结果: {result2}")
+            time.sleep(3)
+    except Exception as e:
+        print(f"      滑块检查失败: {e}")
+
+
+def scroll_to_bottom():
+    """滚动到底部"""
     js = 'window.scrollTo(0, document.body.scrollHeight)'
     run_js(js)
-    time.sleep(3)
+    time.sleep(2)
+    run_js(js)
+    time.sleep(2)
 
 
 def get_products_from_page():
     """从当前页面获取商品列表"""
-    scroll_page()
+    scroll_to_bottom()
     
     js = '''var products = [];
 var rows = document.querySelectorAll('.item4line1');
@@ -92,15 +130,17 @@ JSON.stringify(products);'''
         if products:
             print(f"      🔍 解析到 {len(products)} 个商品")
         return products
-    except Exception as e:
-        print(f"      ⚠️ 解析失败: {str(e)}")
+    except:
         return []
 
 
 def get_price_from_detail(url):
-    """从详情页获取价格（10-15秒等待）"""
+    """从详情页获取价格（15-25秒等待）"""
     subprocess.run(['osascript', '-e', f'tell application "Safari" to open location "{url}"'])
-    time.sleep(10 + random.uniform(5, 5))
+    time.sleep(15 + random.uniform(10, 10))
+    
+    # 检查滑块
+    check_and_solve_slider()
     
     # 检查是否预售
     js_check = '''var title = document.querySelector('.mainTitle--R75fTcZL');
@@ -156,7 +196,7 @@ def save_products(products, shop):
             print(f"         ⏭️ 已存在，跳过")
             continue
         
-        # 获取价格（10-15秒）
+        # 获取价格
         print(f"         获取详情...")
         price, status, title = get_price_from_detail(p['url'])
         
@@ -188,7 +228,7 @@ def save_products(products, shop):
         result = cursor.fetchone()
         product_row_id = result[0] if result else None
         
-        # 保存价格历史（同一天一条）
+        # 保存价格历史
         if price > 0 and product_row_id:
             cursor.execute("SELECT id FROM tmall_price_history WHERE product_id=? AND created_at=?", 
                           (product_row_id, today))
@@ -211,6 +251,7 @@ def save_products(products, shop):
 def go_to_shop(shop):
     subprocess.run(['osascript', '-e', f'tell application "Safari" to open location "{shop["url"]}"'])
     time.sleep(15 + random.uniform(5, 5))
+    check_and_solve_slider()
 
 
 def crawl_shop(shop):
