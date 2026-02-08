@@ -107,7 +107,14 @@ textElem ? textElem.innerText.trim() : 'NOT_FOUND';'''
 
 
 def save_products(products, page_num):
-    """保存商品到数据库"""
+    """保存商品到数据库
+    
+    逻辑：
+    1. 检查商品是否已存在
+    2. 如果已存在：不打开详情页，不重复保存商品，但检查并保存价格历史
+    3. 如果不存在：获取款式名称，保存商品，保存价格历史
+    4. 同一天同一商品只能有一条价格历史
+    """
     if not products:
         return 0, 0
     
@@ -121,25 +128,35 @@ def save_products(products, page_num):
     for i, p in enumerate(products, 1):
         print(f"      [{i}/{len(products)}] {p['id']}")
         
-        # 检查是否已存在
+        # 检查商品是否已存在
         cursor.execute("SELECT id, style_name FROM jd_products WHERE product_id=?", (p['id'],))
         existing = cursor.fetchone()
         
         if existing:
-            # 如果已有商品，检查是否需要获取款式名称
-            if existing[1] is None or existing[1] == '':
-                # 获取款式名称
-                if p['status'] == 'available':
-                    print(f"         Getting style name...")
-                    style = get_style_name(p['url'])
-                    if style:
-                        cursor.execute("UPDATE jd_products SET style_name=?, updated_at=? WHERE product_id=?",
-                            (style, datetime.now().isoformat(), p['id']))
-                        print(f"         ✅ {style}")
-                        style_count += 1
+            # 已存在商品：不打开详情页，不重复保存商品
+            print(f"         ⏭️ 已存在，跳过详情页")
+            
+            # 检查并保存价格历史（同一天同一商品只有一条）
+            if p['status'] == 'available':
+                cursor.execute("""
+                    SELECT id FROM jd_price_history 
+                    WHERE product_id=? AND created_at=?
+                """, (existing[0], today))
+                if cursor.fetchone():
+                    print(f"         ⏭️ 今天已有价格记录，跳过")
+                else:
+                    try:
+                        cursor.execute("""
+                            INSERT INTO jd_price_history (product_id, product_url, price, style_name, created_at)
+                            VALUES (?, ?, ?, ?, ?)
+                        """, (existing[0], p['url'], p['price'], existing[1], today))
+                        conn.commit()
+                        print(f"         ✅ 新增价格历史")
+                    except Exception as e:
+                        print(f"         ❌ 保存价格历史失败: {e}")
             continue
         
-        # 获取款式名称（仅对有价格的商品）
+        # 商品不存在，需要获取款式名称
         style_name = ''
         if p['status'] == 'available':
             print(f"         Getting style name...")
@@ -165,7 +182,7 @@ def save_products(products, page_num):
                 style_name,
                 datetime.now().isoformat(), datetime.now().isoformat()
             ))
-            conn.commit()  # 每条记录立即提交
+            conn.commit()
         except Exception as e:
             print(f"         ❌ 保存商品失败: {e}")
             continue
@@ -175,14 +192,14 @@ def save_products(products, page_num):
         result = cursor.fetchone()
         product_row_id = result[0] if result else None
         
-        # 保存到价格历史表（用 jd_products.id 作为外键）
+        # 保存到价格历史表
         if p['status'] == 'available' and product_row_id:
             try:
                 cursor.execute("""
                     INSERT INTO jd_price_history (product_id, product_url, price, style_name, created_at)
                     VALUES (?, ?, ?, ?, ?)
                 """, (product_row_id, p['url'], p['price'], style_name, today))
-                conn.commit()  # 每条记录立即提交
+                conn.commit()
             except Exception as e:
                 print(f"         ❌ 保存价格历史失败: {e}")
         
