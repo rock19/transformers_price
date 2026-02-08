@@ -69,11 +69,19 @@ if(m) {
         var preprice = priceElem ? priceElem.getAttribute("preprice") : null;
         var hidePrice = priceElem ? priceElem.getAttribute("data-hide-price") : null;
         
+        // 检查是否有预售/预付款标记
+        var presaleTags = item.querySelectorAll(".presale-tag, .presale-tip, [class*='presale'], [class*='yushou'], [class*='yuding']");
+        var isPresale = presaleTags.length > 0;
+        
+        if(isPresale) {
+            console.log("跳过预售商品: " + id);
+            continue;
+        }
+        
         if(preprice && parseFloat(preprice) > 0) {
             products.push({id: id, url: url, img: imgUrl, title: title, price: parseFloat(preprice), status: "available"});
-        } else if(hidePrice === "true") {
-            products.push({id: id, url: url, img: imgUrl, title: title, price: 0, status: "pending"});
         }
+        // 待发布商品不保存到数据库
     }
 }
 JSON.stringify(products);'''

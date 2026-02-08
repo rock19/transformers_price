@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transformers 价格追踪系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
             margin: 0;
@@ -170,15 +171,15 @@
         
         /* 款式名称 */
         .style-name {
-            max-width: 200px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            max-width: 180px;
+            word-break: break-word;
+            line-height: 1.4;
         }
         
         .style-name a {
             color: #667eea;
             text-decoration: none;
+            word-break: break-word;
         }
         
         .style-name a:hover {
@@ -203,11 +204,13 @@
             50% { opacity: 0.8; transform: scale(1.05); }
         }
         
-        /* 价格 */
+        /* 价格样式 */
         .price {
             font-weight: bold;
-            color: #667eea;
             font-size: 1.1em;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
         
         .price-30d {
@@ -216,6 +219,26 @@
         
         .price-min {
             color: #fbbf24;
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+        }
+        
+        .price-min:hover {
+            color: #f59e0b;
+        }
+        
+        .price-arrow {
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        
+        .price-arrow.up {
+            color: #ef4444;
+        }
+        
+        .price-arrow.down {
+            color: #22c55e;
         }
         
         .price-tooltip {
@@ -244,16 +267,105 @@
             opacity: 1;
         }
         
-        /* 状态标签 */
-        .status {
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 0.85em;
+        /* 产品标题 */
+        .product-title {
+            max-width: 250px;
+            word-break: break-word;
+            line-height: 1.4;
         }
         
-        .status-available {
-            background: rgba(74, 222, 128, 0.2);
-            color: #4ade80;
+        /* 模态框 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 900px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-title {
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .modal-close {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #fff;
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 5px 15px;
+            border-radius: 10px;
+        }
+        
+        .modal-close:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        /* 价格统计 */
+        .price-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .price-stat {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .price-stat-label {
+            font-size: 0.85em;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+        
+        .price-stat-value {
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+        
+        .price-stat-value.min {
+            color: #22c55e;
+        }
+        
+        .price-stat-value.max {
+            color: #ef4444;
+        }
+        
+        .price-stat-value.current {
+            color: #667eea;
         }
         
         /* 响应式 */
@@ -284,6 +396,10 @@
             .product-img {
                 width: 40px;
                 height: 40px;
+            }
+            
+            .price-stats {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -357,21 +473,52 @@
         </div>
     </div>
     
+    <!-- 价格历史模态框 -->
+    <div class="modal" id="price-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span id="modal-icon">📈</span>
+                    <span id="modal-title">价格走势</span>
+                </div>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            
+            <!-- 价格统计 -->
+            <div class="price-stats">
+                <div class="price-stat">
+                    <div class="price-stat-label">历史最低</div>
+                    <div class="price-stat-value min" id="stat-min">-</div>
+                </div>
+                <div class="price-stat">
+                    <div class="price-stat-label">最新价格</div>
+                    <div class="price-stat-value current" id="stat-current">-</div>
+                </div>
+                <div class="price-stat">
+                    <div class="price-stat-label">历史最高</div>
+                    <div class="price-stat-value max" id="stat-max">-</div>
+                </div>
+            </div>
+            
+            <!-- 图表 -->
+            <canvas id="price-chart" style="max-height: 400px;"></canvas>
+        </div>
+    </div>
+    
     <script>
         let currentTab = 'jd';
         let allProducts = [];
+        let priceChart = null;
         
         // 切换标签
         function switchTab(tab) {
             currentTab = tab;
             
-            // 更新选中状态
             document.querySelectorAll('.feature-card').forEach(card => {
                 card.classList.remove('active');
             });
             event.currentTarget.classList.add('active');
             
-            // 更新标题
             const titles = {
                 'jd': { icon: '🛒', text: '京东价格列表' },
                 'tmall': { icon: '🏪', text: '天猫价格列表' },
@@ -382,7 +529,6 @@
             document.getElementById('content-icon').textContent = titles[tab].icon;
             document.getElementById('content-title').textContent = titles[tab].text;
             
-            // 加载数据
             loadProducts(tab);
         }
         
@@ -420,33 +566,44 @@
             }
             
             tbody.innerHTML = products.map(p => {
-                // New 标签
                 const newBadge = p.is_new ? '<span class="new-badge">NEW</span>' : '';
                 
-                // 价格
+                // 价格箭头
+                let arrowHtml = '';
+                if (p.latest_price && p.min_price_30d) {
+                    if (p.latest_price > p.min_price_30d) {
+                        // 最新价格高于30日最低 = 下跌了 = 绿色下降箭头
+                        arrowHtml = '<span class="price-arrow down">↓</span>';
+                    } else if (p.latest_price < p.min_price_30d) {
+                        // 最新价格低于30日最低 = 上涨了 = 红色上升箭头
+                        arrowHtml = '<span class="price-arrow up">↑</span>';
+                    }
+                }
+                
                 const latestPrice = p.latest_price ? '¥' + p.latest_price.toFixed(2) : '-';
                 const min30dPrice = p.min_price_30d ? '¥' + p.min_price_30d.toFixed(2) : '-';
                 const minAllPrice = p.min_price_all ? '¥' + p.min_price_all.toFixed(2) : '-';
                 
-                // 图片
                 const imgUrl = p.image_url || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60"><rect fill="%23333" width="60" height="60"/><text fill="%23666" x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="20">?</text></svg>';
                 
-                // 格式化日期
-                const createdAt = p.created_at ? p.created_at.substring(0, 10) : '-';
+                const createdAt = (p.created_at && typeof p.created_at === 'string') ? p.created_at.substring(0, 10) : '-';
+                
+                const safeStyleName = (p.style_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const safeTitle = (p.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 
                 return `
                     <tr>
                         <td><img src="${imgUrl}" class="product-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22><rect fill=%22%23333%22 width=%2260%22 height=%2260%22/><text fill=%22%23666%22 x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22>?</text></svg>'"></td>
                         <td class="style-name">
                             ${newBadge}
-                            <a href="${p.product_url}" target="_blank" title="${p.style_name}">${p.style_name || '-'}</a>
+                            <a href="${p.product_url}" target="_blank" title="${safeStyleName}">${safeStyleName || '-'}</a>
                         </td>
-                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${p.title}">${p.title || '-'}</td>
+                        <td class="product-title" title="${safeTitle}">${safeTitle || '-'}</td>
                         <td>${createdAt}</td>
-                        <td>${p.shop_name || '-'}</td>
+                        <td>${(p.shop_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
                         <td class="price price-30d">${min30dPrice}</td>
-                        <td class="price price-tooltip" data-date="${p.latest_date || ''}">${latestPrice}</td>
-                        <td class="price price-min">${minAllPrice}</td>
+                        <td class="price price-tooltip" data-date="${p.latest_date || ''}">${arrowHtml} ${latestPrice}</td>
+                        <td class="price price-min" onclick="showPriceHistory(${p.id}, '${currentTab}')">${minAllPrice}</td>
                     </tr>
                 `;
             }).join('');
@@ -469,6 +626,151 @@
             
             renderProducts(filtered);
         }
+        
+        // 显示价格历史
+        async function showPriceHistory(productId, source) {
+            const modal = document.getElementById('price-modal');
+            const modalIcon = document.getElementById('modal-icon');
+            const modalTitle = document.getElementById('modal-title');
+            const statMin = document.getElementById('stat-min');
+            const statCurrent = document.getElementById('stat-current');
+            const statMax = document.getElementById('stat-max');
+            
+            modalIcon.textContent = source === 'jd' ? '🛒' : '🏪';
+            modalTitle.textContent = source === 'jd' ? '京东价格走势' : '天猫价格走势';
+            
+            modal.classList.add('show');
+            
+            try {
+                const res = await fetch(`/api/price-history/${productId}?source=${source}`);
+                const history = await res.json();
+                
+                if (history.length === 0) {
+                    statMin.textContent = '-';
+                    statCurrent.textContent = '-';
+                    statMax.textContent = '-';
+                    if (priceChart) {
+                        priceChart.destroy();
+                        priceChart = null;
+                    }
+                    return;
+                }
+                
+                // 计算统计数据
+                const prices = history.map(h => h.price).filter(p => p);
+                const minPrice = prices.length ? Math.min(...prices) : null;
+                const maxPrice = prices.length ? Math.max(...prices) : null;
+                const currentPrice = history[0]?.price || null;
+                
+                statMin.textContent = minPrice ? '¥' + minPrice.toFixed(2) : '-';
+                statCurrent.textContent = currentPrice ? '¥' + currentPrice.toFixed(2) : '-';
+                statMax.textContent = maxPrice ? '¥' + maxPrice.toFixed(2) : '-';
+                
+                // 绘制图表
+                const ctx = document.getElementById('price-chart').getContext('2d');
+                
+                if (priceChart) {
+                    priceChart.destroy();
+                }
+                
+                const labels = history.map(h => {
+                    if (h.created_at) {
+                        return h.created_at.substring(0, 4) + '-' + h.created_at.substring(4, 6) + '-' + h.created_at.substring(6, 8);
+                    }
+                    return '-';
+                });
+                
+                const data = history.map(h => h.price);
+                const styleNames = history.map(h => h.style_name || '');
+                
+                priceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '价格',
+                            data: data,
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 5,
+                            pointBackgroundColor: data.map((price, i) => {
+                                if (price === minPrice) return '#22c55e';
+                                if (price === maxPrice) return '#ef4444';
+                                return '#667eea';
+                            }),
+                            pointBorderColor: data.map((price, i) => {
+                                if (price === minPrice) return '#22c55e';
+                                if (price === maxPrice) return '#ef4444';
+                                return '#667eea';
+                            })
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    afterLabel: function(context) {
+                                        const styleName = styleNames[context.dataIndex];
+                                        return styleName ? '款式: ' + styleName : '';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                grid: {
+                                    color: 'rgba(255,255,255,0.1)'
+                                },
+                                ticks: {
+                                    color: 'rgba(255,255,255,0.7)',
+                                    callback: function(value) {
+                                        return '¥' + value.toFixed(0);
+                                    }
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: 'rgba(255,255,255,0.1)'
+                                },
+                                ticks: {
+                                    color: 'rgba(255,255,255,0.7)'
+                                }
+                            }
+                        }
+                    }
+                });
+                
+            } catch (e) {
+                console.error('加载价格历史失败:', e);
+            }
+        }
+        
+        // 关闭模态框
+        function closeModal() {
+            document.getElementById('price-modal').classList.remove('show');
+        }
+        
+        // 点击背景关闭
+        document.getElementById('price-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+        
+        // ESC关闭
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
         
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
