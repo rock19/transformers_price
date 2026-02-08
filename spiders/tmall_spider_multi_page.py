@@ -21,22 +21,16 @@ SHOPS = [
 ]
 
 
-def random_wait(min_sec=3, max_sec=5):
-    wait_time = random.uniform(min_sec, max_sec)
-    print(f"   waiting {wait_time:.1f}s...")
-    time.sleep(wait_time)
-
-
 def run_js(js_code):
     with open('/tmp/tmall_spider.js', 'w') as f:
         f.write(js_code)
     
     cmd = '''osascript <<'AS'
 tell application "Safari"
-    set jsFile = "/tmp/tmall_spider.js"
-    set js = do shell script "cat " & quoted form of jsFile
-    set result = do JavaScript js in current tab of front window
-    return result
+    set jsFile to "/tmp/tmall_spider.js"
+    set js to do shell script "cat " & quoted form of jsFile
+    set theResult to do JavaScript js in current tab of front window
+    return theResult
 end tell
 AS'''
     
@@ -45,94 +39,104 @@ AS'''
 
 
 def scroll_page():
-    """分15次小滚动，每次200像素，间隔1.5秒"""
-    for i in range(15):
-        js = 'window.scrollBy(0, 200)'
-        run_js(js)
-        time.sleep(1.5)
+    """滚动到底部加载所有商品"""
+    # 先滚动到底部
+    js = 'window.scrollTo(0, document.body.scrollHeight)'
+    run_js(js)
+    time.sleep(3)
     
-    time.sleep(5)
+    # 再滚动到底部（确保加载完成）
+    js = 'window.scrollTo(0, document.body.scrollHeight)'
+    run_js(js)
+    time.sleep(3)
 
 
 def get_products_from_page():
-    """从当前页面获取商品ID列表"""
+    """从当前页面获取商品列表"""
     scroll_page()
     
-    # 天猫商品列表的DOM结构需要根据实际页面调整
     js = '''var products = [];
-var items = document.querySelectorAll('.item');
-if(items.length === 0) {
-    items = document.querySelectorAll('[class*="item"]');
-}
-for(var i=0; i<items.length; i++) {
-    var item = items[i];
-    var link = item.querySelector('a[href*="item.taobao.com"]');
-    var img = item.querySelector('img');
-    var priceElem = item.querySelector('[class*="price"]');
-    
-    var url = link ? link.href : "";
-    var idMatch = url.match(/id=(\\d+)/);
-    var productId = idMatch ? idMatch[1] : "";
-    var title = img ? (img.alt || img.title || "") : "";
-    var imgUrl = img ? (img.src || img['data-src'] || "") : "";
-    var price = priceElem ? parseFloat(priceElem.innerText.replace(/[^0-9.]/g, '')) : 0;
-    
-    if(productId) {
-        products.push({
-            id: productId,
-            url: url,
-            img: imgUrl,
-            title: title,
-            price: price,
-            status: price > 0 ? "available" : "pending"
-        });
+var rows = document.querySelectorAll('.item4line1');
+for(var r=0; r<rows.length; r++) {
+    var row = rows[r];
+    var items = row.querySelectorAll('[class*="item"]');
+    for(var i=0; i<items.length; i++) {
+        var item = items[i];
+        var productId = item.getAttribute('data-id');
+        if(!productId) continue;
+        
+        var link = item.querySelector('a');
+        var url = link ? link.href : "";
+        var img = item.querySelector('img');
+        var imgUrl = img ? (img.src || img['data-src'] || img['data-original'] || "") : "";
+        var title = img ? (img.alt || img.title || "") : "";
+        
+        if(productId) {
+            products.push({
+                id: productId,
+                url: url,
+                img: imgUrl,
+                title: title,
+                price: 0,
+                status: "pending"
+            });
+        }
     }
 }
 JSON.stringify(products);'''
     
     result = run_js(js)
+    
     try:
-        return json.loads(result) if result else []
-    except:
+        products = json.loads(result) if result else []
+        if products:
+            print(f"      🔍 解析到 {len(products)} 个商品")
+        return products
+    except Exception as e:
+        print(f"      ⚠️ 解析失败: {str(e)}")
         return []
 
 
-def get_style_name(product_url):
-    """从详情页获取款式名称"""
-    # 打开详情页
-    subprocess.run(['osascript', '-e', f'tell application "Safari" to open location "{product_url}"'])
-    time.sleep(6)
+def get_price_from_detail(url):
+    """从详情页获取价格（10-15秒等待）"""
+    subprocess.run(['osascript', '-e', f'tell application "Safari" to open location "{url}"'])
+    time.sleep(10 + random.uniform(5, 5))
     
-    # 获取款式名称（天猫的DOM结构需要调整）
-    js = '''var spec = document.querySelector('.tb-sku');
-var text = "";
-if(spec) {
-    var selected = spec.querySelector('.tb-selected');
-    if(selected) {
-        text = selected.innerText.trim();
-    }
-}
-text || 'NOT_FOUND';'''
+    # 检查是否预售
+    js_check = '''var title = document.querySelector('.mainTitle--R75fTcZL');
+var text = title ? title.innerText : "";
+JSON.stringify({isPreSale: text.includes("预售") || text.includes("新品"), title: text.substring(0, 50)});'''
     
-    result = run_js(js)
+    result = run_js(js_check)
     
-    # 关闭详情页
+    try:
+        data = json.loads(result) if result else {}
+        if data.get('isPreSale'):
+            print(f"         🚫 预售，跳过")
+            subprocess.run(['osascript', '-e', 'tell application "Safari" to close front window'])
+            return None, "pending", data.get('title', '')
+    except:
+        pass
+    
+    # 获取价格
+    js_price = '''var priceElem = document.querySelector('.text--LP7Wf49z');
+var priceText = priceElem ? priceElem.innerText : "";
+var price = parseFloat(priceText.replace(/[^0-9.]/g, '')) || 0;
+JSON.stringify({price: price, raw: priceText});'''
+    
+    result2 = run_js(js_price)
+    
     subprocess.run(['osascript', '-e', 'tell application "Safari" to close front window'])
     
-    if result and result != 'NOT_FOUND':
-        return result
-    return ''
+    try:
+        data = json.loads(result2) if result2 else {}
+        return data.get('price', 0), "available", ""
+    except:
+        return 0, "pending", ""
 
 
 def save_products(products, shop):
-    """保存商品到数据库（天猫表）
-    
-    逻辑：
-    1. 检查商品是否已存在
-    2. 如果已存在：不打开详情页，不重复保存商品，但检查并保存价格历史
-    3. 如果不存在：获取款式名称，保存商品，保存价格历史
-    4. 同一天同一商品只能有一条价格历史
-    """
+    """保存商品到数据库"""
     if not products:
         return 0, 0
     
@@ -146,80 +150,57 @@ def save_products(products, shop):
     for i, p in enumerate(products, 1):
         print(f"      [{i}/{len(products)}] {p['id']}")
         
-        # 检查商品是否已存在
-        cursor.execute("SELECT id, style_name FROM tmall_products WHERE product_id=?", (p['id'],))
-        existing = cursor.fetchone()
-        
-        if existing:
-            # 已存在商品：不打开详情页
-            print(f"         ⏭️ 已存在，跳过详情页")
-            
-            # 检查并保存价格历史（同一天同一商品只有一条）
-            if p['status'] == 'available':
-                cursor.execute("""
-                    SELECT id FROM tmall_price_history 
-                    WHERE product_id=? AND created_at=?
-                """, (existing[0], today))
-                if cursor.fetchone():
-                    print(f"         ⏭️ 今天已有价格记录，跳过")
-                else:
-                    try:
-                        cursor.execute("""
-                            INSERT INTO tmall_price_history (product_id, product_url, price, style_name, created_at)
-                            VALUES (?, ?, ?, ?, ?)
-                        """, (existing[0], p['url'], p['price'], existing[1], today))
-                        conn.commit()
-                        print(f"         ✅ 新增价格历史")
-                    except Exception as e:
-                        print(f"         ❌ 保存价格历史失败: {e}")
+        # 检查是否已存在
+        cursor.execute("SELECT id FROM tmall_products WHERE product_id=?", (p['id'],))
+        if cursor.fetchone():
+            print(f"         ⏭️ 已存在，跳过")
             continue
         
-        # 商品不存在，需要获取款式名称
-        style_name = ''
-        if p['status'] == 'available':
-            print(f"         Getting style name...")
-            style_name = get_style_name(p['url'])
-            if style_name:
-                print(f"         ✅ {style_name}")
-                style_count += 1
-            else:
-                print(f"         ⚠️ No style name")
-        else:
-            print(f"         ⏭️ Pending, skip")
+        # 获取价格（10-15秒）
+        print(f"         获取详情...")
+        price, status, title = get_price_from_detail(p['url'])
+        
+        if price is None:
+            print(f"         🚫 预售，跳过")
+            continue
+        
+        print(f"         ✅ ¥{price}")
         
         # 保存商品
         try:
             cursor.execute("""
                 INSERT INTO tmall_products 
-                    (product_id, product_url, image_url, title, price, status, shop_name, shop_url, style_name, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (product_id, product_url, image_url, title, price, status, shop_name, shop_url, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                p['id'], p['url'], p['img'], p['title'][:500],
-                p['price'], p['status'],
+                p['id'], p['url'], p['img'], title or p['title'][:500],
+                price, status,
                 shop['name'], shop['url'],
-                style_name,
                 datetime.now().isoformat(), datetime.now().isoformat()
             ))
             conn.commit()
         except Exception as e:
-            print(f"         ❌ 保存商品失败: {e}")
+            print(f"         ❌ 保存失败: {e}")
             continue
         
-        # 获取刚插入商品的 id（自增主键）
+        # 获取自增ID
         cursor.execute("SELECT id FROM tmall_products WHERE product_id=?", (p['id'],))
         result = cursor.fetchone()
         product_row_id = result[0] if result else None
         
-        # 保存到价格历史表
-        if p['status'] == 'available' and product_row_id:
-            try:
-                cursor.execute("""
-                    INSERT INTO tmall_price_history (product_id, product_url, price, style_name, created_at)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (product_row_id, p['url'], p['price'], style_name, today))
-                conn.commit()
-            except Exception as e:
-                print(f"         ❌ 保存价格历史失败: {e}")
+        # 保存价格历史（同一天一条）
+        if price > 0 and product_row_id:
+            cursor.execute("SELECT id FROM tmall_price_history WHERE product_id=? AND created_at=?", 
+                          (product_row_id, today))
+            if not cursor.fetchone():
+                try:
+                    cursor.execute("""
+                        INSERT INTO tmall_price_history (product_id, product_url, price, created_at)
+                        VALUES (?, ?, ?, ?)
+                    """, (product_row_id, p['url'], price, today))
+                    conn.commit()
+                except:
+                    pass
         
         new_count += 1
     
@@ -228,13 +209,11 @@ def save_products(products, shop):
 
 
 def go_to_shop(shop):
-    """打开店铺页面"""
     subprocess.run(['osascript', '-e', f'tell application "Safari" to open location "{shop["url"]}"'])
-    random_wait(15, 20)
+    time.sleep(15 + random.uniform(5, 5))
 
 
 def crawl_shop(shop):
-    """爬取单个店铺"""
     print(f"\n{'='*80}")
     print(f"🏪 {shop['name']}")
     print(f"{'='*80}")
@@ -244,11 +223,6 @@ def crawl_shop(shop):
     
     print(f"\nParsing products...")
     products = get_products_from_page()
-    print(f"Found {len(products)} products")
-    
-    available = sum(1 for p in products if p['status'] == 'available')
-    pending = sum(1 for p in products if p['status'] == 'pending')
-    print(f"Available: {available} | Pending: {pending}")
     
     print(f"\nSaving products...")
     new_count, style_count = save_products(products, shop)
@@ -289,9 +263,6 @@ def main():
     cursor.execute("SELECT COUNT(*) FROM tmall_products WHERE status='pending'")
     pending_count = cursor.fetchone()[0]
     
-    cursor.execute("SELECT COUNT(*) FROM tmall_products WHERE style_name IS NOT NULL AND style_name != ''")
-    styled_count = cursor.fetchone()[0]
-    
     conn.close()
     
     print(f"\n" + "="*80)
@@ -299,11 +270,10 @@ def main():
     print("="*80)
     print(f"  Total: {total_products} | New: {total_new}")
     print(f"  Available: {available_count} | Pending: {pending_count}")
-    print(f"  With Style: {styled_count} | History: {history}")
+    print(f"  History: {history}")
     print(f"\nDone!")
     print("="*80)
 
 
 if __name__ == '__main__':
-    random.seed()
     main()
