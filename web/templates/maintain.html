@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商品维护 - Transformers 价格追踪</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); min-height: 100vh; color: #fff; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        h1 { text-align: center; margin-bottom: 30px; }
+        
+        /* 返回主站 */
+        .back-link { display: inline-block; margin-bottom: 20px; color: #667eea; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+        
+        /* 标签切换 */
+        .tabs { display: flex; gap: 15px; margin-bottom: 25px; }
+        .tab-btn { flex: 1; padding: 15px 20px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; cursor: pointer; transition: all 0.3s; text-align: center; }
+        .tab-btn:hover { background: rgba(255,255,255,0.1); }
+        .tab-btn.active { background: rgba(102, 126, 234, 0.3); border-color: #667eea; }
+        .tab-btn .icon { font-size: 24px; margin-bottom: 5px; }
+        .tab-btn .text { font-size: 14px; }
+        
+        /* 筛选区域 */
+        .filters { display: flex; flex-wrap: wrap; gap: 15px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 20px; align-items: flex-end; }
+        .filter-group { flex: 1; min-width: 200px; }
+        .filter-group label { display: block; margin-bottom: 8px; font-size: 13px; opacity: 0.8; }
+        .filter-group input, .filter-group select { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #fff; font-size: 14px; }
+        .filter-group input::placeholder { color: rgba(255,255,255,0.5); }
+        .filter-group select option { background: #1a1a2e; }
+        .filter-actions { display: flex; gap: 10px; }
+        .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; transition: all 0.3s; }
+        .btn-primary { background: #667eea; color: #fff; }
+        .btn-primary:hover { background: #5a67d8; }
+        .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; }
+        .btn-secondary:hover { background: rgba(255,255,255,0.2); }
+        
+        /* 统计信息 */
+        .stats { display: flex; gap: 20px; margin-bottom: 20px; }
+        .stat-card { flex: 1; padding: 15px 20px; background: rgba(255,255,255,0.05); border-radius: 10px; text-align: center; }
+        .stat-card .number { font-size: 28px; font-weight: bold; color: #667eea; }
+        .stat-card .label { font-size: 13px; opacity: 0.7; margin-top: 5px; }
+        
+        /* 商品表格 */
+        .product-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 12px; overflow: hidden; }
+        .product-table th { padding: 15px; text-align: left; background: rgba(255,255,255,0.05); font-weight: 500; font-size: 13px; opacity: 0.8; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .product-table td { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle; }
+        .product-table tr:hover { background: rgba(255,255,255,0.03); }
+        .product-img { width: 180px; height: 160px; border-radius: 8px; object-fit: cover; }
+        
+        /* 状态标签 */
+        .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+        .status-badge.purchased { background: rgba(34, 197, 94, 0.2); color: #22c55e; border: 1px solid #22c55e; }
+        .status-badge.not-purchased { background: rgba(255, 255, 255, 0.1); color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.2); }
+        .status-badge.followed { background: rgba(59, 130, 246, 0.2); color: #3b82f6; border: 1px solid #3b82f6; }
+        .status-badge.not-followed { background: rgba(255, 255, 255, 0.1); color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.2); }
+        .status-badge:hover { opacity: 0.8; }
+        
+        /* 商品链接 */
+        .product-link { color: #667eea; text-decoration: none; }
+        .product-link:hover { text-decoration: underline; }
+        
+        /* 款式名称和标题自动换行 */
+        .product-title { max-width: none; white-space: normal; word-break: break-all; line-height: 1.4; }
+        .style-name { max-width: none; white-space: normal; word-break: break-all; line-height: 1.4; }
+        
+        /* 空状态 */
+        .empty-state { text-align: center; padding: 60px 20px; opacity: 0.6; }
+        .empty-state .icon { font-size: 48px; margin-bottom: 15px; }
+        
+        /* 提示消息 */
+        .toast { position: fixed; top: 20px; right: 20px; padding: 15px 25px; background: rgba(34, 197, 94, 0.9); color: #fff; border-radius: 8px; opacity: 0; transform: translateY(-20px); transition: all 0.3s; z-index: 1000; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.error { background: rgba(239, 68, 68, 0.9); }
+        
+        /* 操作按钮 */
+        .action-btn { padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; transition: all 0.2s; background: rgba(102, 126, 234, 0.2); color: #667eea; }
+        .action-btn:hover { background: rgba(102, 126, 234, 0.4); }
+        
+        /* 弹窗 */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; }
+        .modal.show { display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: #1a1a2e; border-radius: 16px; padding: 30px; max-width: 600px; width: 95%; max-height: 95vh; overflow-y: auto; }
+        .modal-header { display: flex; align-items: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .modal-header h2 { font-size: 20px; }
+        .modal-close { margin-left: auto; font-size: 28px; cursor: pointer; background: none; border: none; color: #fff; }
+        .modal-body { margin-bottom: 25px; }
+        .modal-footer { display: flex; gap: 10px; justify-content: flex-end; }
+        
+        /* 商品预览 */
+        .product-preview { display: block; padding: 25px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 25px; text-align: center; }
+        .product-preview img { display: block; width: 320px; height: 240px; margin: 0 auto 20px; border-radius: 12px; object-fit: contain; background: #000; }
+        .product-preview-info { text-align: left; }
+        .product-preview-info h4 { margin-bottom: 12px; font-size: 20px; }
+        .product-preview-info p { font-size: 15px; opacity: 0.8; margin-bottom: 10px; }
+        
+        /* 表单 */
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-size: 13px; opacity: 0.8; }
+        
+        /* 状态切换 */
+        .toggle-group { display: flex; gap: 10px; }
+        .toggle-btn { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); cursor: pointer; text-align: center; transition: all 0.2s; }
+        .toggle-btn.active { border-color: #22c55e; background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← 返回主站</a>
+        <h1>📦 商品维护</h1>
+        
+        <!-- 平台切换 -->
+        <div class="tabs">
+            <div class="tab-btn" onclick="switchPlatform('summary', this)">
+                <div class="icon">📋</div>
+                <div class="text">总表维护</div>
+            </div>
+            <div class="tab-btn active" onclick="switchPlatform('jd', this)">
+                <div class="icon">🛒</div>
+                <div class="text">京东商品</div>
+            </div>
+            <div class="tab-btn" onclick="switchPlatform('tmall', this)">
+                <div class="icon">🏪</div>
+                <div class="text">天猫商品</div>
+            </div>
+        </div>
+        
+        <!-- 筛选区域 -->
+        <div class="filters">
+            <div class="filter-group">
+                <label>产品标题</label>
+                <input type="text" id="filter-title" placeholder="搜索标题..." oninput="loadProducts()">
+            </div>
+            <div class="filter-group">
+                <label>款式名称</label>
+                <input type="text" id="filter-style" placeholder="搜索款式..." oninput="loadProducts()">
+            </div>
+            <div class="filter-group">
+                <label>产品地址</label>
+                <input type="text" id="filter-url" placeholder="搜索地址..." oninput="loadProducts()">
+            </div>
+            <div class="filter-group">
+                <label>是否购买</label>
+                <select id="filter-purchased" onchange="loadProducts()">
+                    <option value="">全部</option>
+                    <option value="未购买">未购买</option>
+                    <option value="购买">已购买</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>是否关注</label>
+                <select id="filter-followed" onchange="loadProducts()">
+                    <option value="">全部</option>
+                    <option value="未关注">未关注</option>
+                    <option value="关注">已关注</option>
+                </select>
+            </div>
+            <div class="filter-actions">
+                <button class="btn btn-secondary" onclick="clearFilters()">清空</button>
+            </div>
+        </div>
+        
+        <!-- 总表操作按钮 -->
+        <div id="summary-actions" style="display:none; margin-bottom:20px;">
+            <button class="btn btn-primary" onclick="showAddSummaryModal()">➕ 添加总表记录</button>
+        </div>
+        
+        <!-- 统计信息 -->
+        <div class="stats">
+            <div class="stat-card">
+                <div class="number" id="total-count">0</div>
+                <div class="label">全部商品</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="purchased-count">0</div>
+                <div class="label">已购买</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="followed-count">0</div>
+                <div class="label">已关注</div>
+            </div>
+        </div>
+        
+        <!-- 商品表格 -->
+        <table class="product-table">
+            <thead>
+                <tr>
+                    <th style="width:80px;">商品</th>
+                    <th style="width:180px;">款式名称</th>
+                    <th>产品标题</th>
+                    <th style="width:100px;">是否购买</th>
+                    <th style="width:100px;">是否关注</th>
+                    <th style="width:250px;">产品地址</th>
+                    <th style="width:80px;">操作</th>
+                </tr>
+            </thead>
+            <tbody id="product-list">
+                <tr><td colspan="7" class="empty-state"><div class="icon">📦</div><div>加载中...</div></td></tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- 提示消息 -->
+    <div id="toast" class="toast">保存成功</div>
+    
+    <!-- 编辑弹窗 -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>编辑商品</h2>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <!-- 商品预览 -->
+                <div class="product-preview" id="modal-preview">
+                    <img id="modal-img" src="" alt="商品图片">
+                    <div class="product-preview-info">
+                        <h4 id="modal-title">-</h4>
+                        <p id="modal-style">款式：-</p>
+                        <p id="modal-shop">店铺：-</p>
+                        <p id="modal-platform">平台：-</p>
+                    </div>
+                </div>
+                
+                <!-- 编辑表单 -->
+                <div class="form-group">
+                    <label>是否购买</label>
+                    <div class="toggle-group">
+                        <div class="toggle-btn" id="purchased-no" onclick="setPurchased(false)">未购买</div>
+                        <div class="toggle-btn" id="purchased-yes" onclick="setPurchased(true)">已购买</div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>是否关注</label>
+                    <div class="toggle-group">
+                        <div class="toggle-btn" id="followed-no" onclick="setFollowed(false)">未关注</div>
+                        <div class="toggle-btn" id="followed-yes" onclick="setFollowed(true)">已关注</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveProduct()">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    var currentPlatform = 'summary';  // 默认总表
+    var allProducts = [];
+    var allSummary = [];
+    
+    function switchPlatform(platform, btn) {
+        currentPlatform = platform;
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        
+        if (platform === 'summary') {
+            document.querySelector('.filters').style.display = 'none';
+            document.getElementById('summary-actions').style.display = 'block';
+            loadSummary();
+        } else {
+            document.querySelector('.filters').style.display = 'flex';
+            document.getElementById('summary-actions').style.display = 'none';
+            loadProducts();
+        }
+    }
+    
+    // ========== 总表相关 ==========
+    function loadSummary() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/summary', true);
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                try {
+                    allSummary = JSON.parse(xhr.responseText);
+                    renderSummary();
+                } catch (e) {
+                    console.error('Error:', e);
+                }
+            }
+        };
+        xhr.send();
+    }
+    
+    function renderSummary() {
+        // 修改表格列头
+        var thead = document.querySelector('.product-table thead tr');
+        thead.innerHTML = '<th style="width:80px;">商品</th><th style="width:180px;">产品名称</th><th style="width:100px;">类型</th><th>京东商品</th><th>天猫商品</th><th style="width:80px;">操作</th>';
+        
+        var tbody = document.getElementById('product-list');
+        
+        if (allSummary.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="icon">📋</div><div>总表为空，点击上方"添加总表记录"按钮</div></td></tr>';
+            return;
+        }
+        
+        var html = '';
+        for (var i = 0; i < allSummary.length; i++) {
+            var s = allSummary[i];
+            
+            var jdImg = s.jd && s.jd.image ? s.jd.image : '';
+            var tmallImg = s.tmall && s.tmall.image ? s.tmall.image : '';
+            var imgDisplay = jdImg || tmallImg || '?';
+            
+            var jdPrice = s.jd && s.jd.price ? '¥' + s.jd.price : '-';
+            var tmallPrice = s.tmall && s.tmall.price ? '¥' + s.tmall.price : '-';
+            
+            var jdTitle = s.jd && s.jd.title ? s.jd.title : '-';
+            var tmallTitle = s.tmall && s.tmall.title ? s.tmall.title : '-';
+            
+            html += '<tr>';
+            html += '<td><img src="' + imgDisplay + '" class="product-img" onerror="this.src=\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22><rect fill=%22%23333%22 width=%2260%22 height=%2260%22/><text fill=%22%23666%22 x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22>?</text></svg>\'"></td>';
+            html += '<td><input type="text" class="edit-input" value="' + (s.product_name || '') + '" onchange="updateSummary(' + s.id + ', \'product_name\', this.value)"></td>';
+            html += '<td><input type="text" class="edit-input" style="width:80px" value="' + (s.product_type || '') + '" onchange="updateSummary(' + s.id + ', \'product_type\', this.value)"></td>';
+            html += '<td><div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + jdTitle + '</div><span class="price-tag">' + jdPrice + '</span></td>';
+            html += '<td><div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + tmallTitle + '</div><span class="price-tag">' + tmallPrice + '</span></td>';
+            html += '<td><button class="action-btn" onclick="deleteSummary(' + s.id + ')">删除</button></td>';
+            html += '</tr>';
+        }
+        
+        tbody.innerHTML = html;
+    }
+    
+    function updateSummary(id, field, value) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/summary-update', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                showToast('保存成功');
+                loadSummary();
+            } else {
+                showToast('保存失败', true);
+            }
+        };
+        xhr.send(JSON.stringify({ id: id, [field]: value }));
+    }
+    
+    function deleteSummary(id) {
+        if (!confirm('确定删除？')) return;
+        
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/summary-delete', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                showToast('已删除');
+                loadSummary();
+            } else {
+                showToast('删除失败', true);
+            }
+        };
+        xhr.send(JSON.stringify({ id: id }));
+    }
+    
+    function showAddSummaryModal() {
+        document.getElementById('summary-modal').classList.add('show');
+        document.getElementById('new-product-name').value = '';
+        document.getElementById('new-product-type').value = '';
+    }
+    
+    function closeSummaryModal() {
+        document.getElementById('summary-modal').classList.remove('show');
+    }
+    
+    function saveSummary() {
+        var name = document.getElementById('new-product-name').value.trim();
+        var type = document.getElementById('new-product-type').value.trim();
+        
+        if (!name) {
+            alert('请输入产品名称');
+            return;
+        }
+        
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/summary-create', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                closeSummaryModal();
+                showToast('添加成功');
+                loadSummary();
+            } else {
+                showToast('添加失败', true);
+            }
+        };
+        xhr.send(JSON.stringify({ product_name: name, product_type: type }));
+    }
+    
+    // ========== 京东/天猫商品相关 ==========
+    function loadProducts() {
+        var xhr = new XMLHttpRequest();
+        var url = currentPlatform === 'jd' ? '/api/jd-prices' : '/api/tmall-prices';
+        xhr.open('GET', url, true);
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                try {
+                    allProducts = JSON.parse(xhr.responseText);
+                    renderProducts();
+                } catch (e) {
+                    console.error('Error:', e);
+                }
+            }
+        };
+        xhr.send();
+    }
+    
+    function renderProducts() {
+        // 恢复京东/天猫表格列头
+        var thead = document.querySelector('.product-table thead tr');
+        thead.innerHTML = '<th style="width:80px;">商品</th><th style="width:180px;">款式名称</th><th>产品标题</th><th style="width:100px;">是否购买</th><th style="width:100px;">是否关注</th><th style="width:250px;">产品地址</th><th style="width:80px;">操作</th>';
+        
+        // 获取筛选条件
+        var title = document.getElementById('filter-title').value.toLowerCase();
+        var style = document.getElementById('filter-style').value.toLowerCase();
+        var url = document.getElementById('filter-url').value.toLowerCase();
+        var purchased = document.getElementById('filter-purchased').value;
+        var followed = document.getElementById('filter-followed').value;
+        
+        // 筛选
+        var filtered = allProducts.filter(function(p) {
+            if (title && (p.title || '').toLowerCase().indexOf(title) === -1) return false;
+            if (style && (p.style_name || '').toLowerCase().indexOf(style) === -1) return false;
+            if (url && (p.product_url || '').toLowerCase().indexOf(url) === -1) return false;
+            if (purchased && p.is_purchased !== purchased) return false;
+            if (followed && p.is_followed !== followed) return false;
+            return true;
+        });
+        
+        // 更新统计
+        document.getElementById('total-count').textContent = allProducts.length;
+        document.getElementById('purchased-count').textContent = allProducts.filter(function(p) { return p.is_purchased === '购买'; }).length;
+        document.getElementById('followed-count').textContent = allProducts.filter(function(p) { return p.is_followed === '关注'; }).length;
+        
+        // 渲染表格
+        var tbody = document.getElementById('product-list');
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="icon">📦</div><div>暂无符合条件的商品</div></td></tr>';
+            return;
+        }
+        
+        var html = '';
+        for (var i = 0; i < filtered.length; i++) {
+            var p = filtered[i];
+            var imgUrl = (p.image_url || '').replace(/&/g, '&amp;');
+            var safeStyleName = (p.style_name || '-').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            var safeTitle = (p.title || '-').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            var safeUrl = (p.product_url || '#').replace(/&/g, '&amp;');
+            
+            var purchasedClass = p.is_purchased === '购买' ? 'purchased' : 'not-purchased';
+            var purchasedText = p.is_purchased === '购买' ? '已购买' : '未购买';
+            var followedClass = p.is_followed === '关注' ? 'followed' : 'not-followed';
+            var followedText = p.is_followed === '关注' ? '已关注' : '未关注';
+            
+            html += '<tr>';
+            html += '<td><img src="' + imgUrl + '" class="product-img" onerror="this.src=\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22><rect fill=%22%23333%22 width=%2260%22 height=%2260%22/><text fill=%22%23666%22 x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22>?</text></svg>\'"></td>';
+            html += '<td class="style-name" title="' + safeStyleName + '">' + safeStyleName + '</td>';
+            html += '<td class="product-title" title="' + safeTitle + '">' + safeTitle + '</td>';
+            html += '<td><span class="status-badge ' + purchasedClass + '" onclick="toggleStatus(' + p.id + ', \'is_purchased\')">' + purchasedText + '</span></td>';
+            html += '<td><span class="status-badge ' + followedClass + '" onclick="toggleStatus(' + p.id + ', \'is_followed\')">' + followedText + '</span></td>';
+            html += '<td><a href="' + safeUrl + '" class="product-link" target="_blank">' + (p.product_url || '-').substring(0, 40) + '</a></td>';
+            html += '<td><button class="action-btn" onclick="editProduct(' + p.id + ')">编辑</button></td>';
+            html += '</tr>';
+        }
+        
+        tbody.innerHTML = html;
+    }
+    
+    function toggleStatus(productId, field) {
+        var product = null;
+        for (var i = 0; i < allProducts.length; i++) {
+            if (allProducts[i].id === productId) {
+                product = allProducts[i];
+                break;
+            }
+        }
+        if (!product) return;
+        
+        // 切换状态
+        var newValue = product[field] === (field === 'is_purchased' ? '购买' : '关注') ? 
+            (field === 'is_purchased' ? '未购买' : '未关注') : 
+            (field === 'is_purchased' ? '购买' : '关注');
+        
+        // 发送更新请求
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/update-product', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                try {
+                    var res = JSON.parse(xhr.responseText);
+                    if (res.success) {
+                        product[field] = newValue;
+                        renderProducts();
+                        showToast('保存成功');
+                    } else {
+                        showToast('保存失败', true);
+                    }
+                } catch (e) {
+                    showToast('保存失败', true);
+                }
+            } else {
+                showToast('保存失败', true);
+            }
+        };
+        xhr.send(JSON.stringify({
+            id: productId,
+            source: currentPlatform,
+            is_purchased: product.is_purchased,
+            is_followed: product.is_followed,
+            [field]: newValue
+        }));
+    }
+    
+    function clearFilters() {
+        document.getElementById('filter-title').value = '';
+        document.getElementById('filter-style').value = '';
+        document.getElementById('filter-url').value = '';
+        document.getElementById('filter-purchased').value = '';
+        document.getElementById('filter-followed').value = '';
+        loadProducts();
+    }
+    
+    function showToast(msg, isError) {
+        var toast = document.getElementById('toast');
+        toast.textContent = msg;
+        toast.className = 'toast' + (isError ? ' error' : '');
+        toast.classList.add('show');
+        setTimeout(function() { toast.classList.remove('show'); }, 2000);
+    }
+    
+    // 编辑相关
+    var editingProduct = null;
+    
+    function editProduct(productId) {
+        // 查找商品
+        for (var i = 0; i < allProducts.length; i++) {
+            if (allProducts[i].id === productId) {
+                editingProduct = allProducts[i];
+                break;
+            }
+        }
+        if (!editingProduct) return;
+        
+        // 显示商品信息
+        document.getElementById('modal-img').src = editingProduct.image_url || '';
+        document.getElementById('modal-img').onerror = function() { this.src = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22><rect fill=%22%23333%22 width=%2280%22 height=%2280%22/><text fill=%22%23666%22 x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22>?</text></svg>'; };
+        document.getElementById('modal-title').textContent = editingProduct.title || '-';
+        document.getElementById('modal-style').textContent = '款式：' + (editingProduct.style_name || '-');
+        document.getElementById('modal-shop').textContent = '店铺：' + (editingProduct.shop_name || '-');
+        document.getElementById('modal-platform').textContent = '平台：' + (currentPlatform === 'jd' ? '京东' : '天猫');
+        
+        // 设置状态
+        setPurchased(editingProduct.is_purchased === '购买');
+        setFollowed(editingProduct.is_followed === '关注');
+        
+        // 显示弹窗
+        document.getElementById('edit-modal').classList.add('show');
+    }
+    
+    function closeModal() {
+        document.getElementById('edit-modal').classList.remove('show');
+        editingProduct = null;
+    }
+    
+    function setPurchased(isPurchased) {
+        document.getElementById('purchased-no').classList.toggle('active', !isPurchased);
+        document.getElementById('purchased-yes').classList.toggle('active', isPurchased);
+        if (editingProduct) {
+            editingProduct.is_purchased = isPurchased ? '购买' : '未购买';
+        }
+    }
+    
+    function setFollowed(isFollowed) {
+        document.getElementById('followed-no').classList.toggle('active', !isFollowed);
+        document.getElementById('followed-yes').classList.toggle('active', isFollowed);
+        if (editingProduct) {
+            editingProduct.is_followed = isFollowed ? '关注' : '未关注';
+        }
+    }
+    
+    function saveProduct() {
+        if (!editingProduct) return;
+        
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/update-product', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                try {
+                    var res = JSON.parse(xhr.responseText);
+                    if (res.success) {
+                        closeModal();
+                        loadProducts();
+                        showToast('保存成功');
+                    } else {
+                        showToast('保存失败', true);
+                    }
+                } catch (e) {
+                    showToast('保存失败', true);
+                }
+            } else {
+                showToast('保存失败', true);
+            }
+        };
+        xhr.send(JSON.stringify({
+            id: editingProduct.id,
+            source: currentPlatform,
+            is_purchased: editingProduct.is_purchased,
+            is_followed: editingProduct.is_followed
+        }));
+    }
+    
+    // 点击弹窗外部关闭
+    document.getElementById('edit-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+    
+    <!-- 总表添加弹窗 -->
+    <div id="summary-modal" class="modal" onclick="if(event.target===this) closeSummaryModal()">
+        <div class="modal-content">
+            <h2 style="margin-bottom:20px;">添加总表记录</h2>
+            <div class="form-group">
+                <label>产品名称</label>
+                <input type="text" id="new-product-name" placeholder="输入产品名称" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.1);color:#fff;">
+            </div>
+            <div class="form-group">
+                <label>产品类型</label>
+                <input type="text" id="new-product-type" placeholder="可选，如：大师级、泰坦级等" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.1);color:#fff;margin-top:10px;">
+            </div>
+            <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end;">
+                <button class="btn btn-secondary" onclick="closeSummaryModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveSummary()">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <style>
+    .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; }
+    .modal.show { display:flex; }
+    .modal-content { background:#1a1a2e; padding:30px; border-radius:12px; min-width:400px; }
+    .edit-input { width:100%; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:#fff; font-size:13px; }
+    .price-tag { display:inline-block; background:rgba(102,126,234,0.2); padding:2px 8px; border-radius:4px; font-size:12px; margin-top:5px; }
+    </style>
+    
+    // 页面加载
+    window.onload = function() { switchPlatform('summary', document.querySelector('.tab-btn')); };
+    </script>

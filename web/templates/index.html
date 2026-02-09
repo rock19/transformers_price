@@ -3,456 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Transformers 价格追踪系统</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); min-height: 100vh; color: #fff; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; padding: 30px 0; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); border-radius: 20px; margin-bottom: 30px; box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3); }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header p { opacity: 0.9; font-size: 1.1em; }
+        .features { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
+        .feature-card { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-radius: 20px; padding: 25px 20px; text-align: center; cursor: pointer; transition: all 0.3s ease; border: 2px solid transparent; }
+        .feature-card:hover { transform: translateY(-5px); border-color: #667eea; box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3); }
+        .feature-card.active { border-color: #667eea; background: rgba(102, 126, 234, 0.2); }
+        .feature-card .icon { font-size: 2.5em; margin-bottom: 12px; }
+        .feature-card h3 { font-size: 1.1em; margin-bottom: 6px; }
+        .feature-card p { font-size: 0.85em; opacity: 0.7; }
+        .content { background: rgba(255, 255, 255, 0.05); border-radius: 20px; padding: 25px; min-height: 500px; backdrop-filter: blur(10px); }
+        .content-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
         
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            min-height: 100vh;
-            color: #fff;
-        }
+        /* 统计标签 - 磁贴样式 */
+        .stats-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat-tag { padding: 10px 20px; border-radius: 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); font-size: 14px; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        .stat-tag .num { font-weight: bold; font-size: 16px; margin-left: 6px; }
+        .stat-tag.total { background: linear-gradient(135deg, rgba(102, 126, 234, 0.3), rgba(102, 126, 234, 0.1)); border-color: #667eea; }
+        .stat-tag.purchased { background: linear-gradient(135deg, rgba(34, 197, 94, 0.3), rgba(34, 197, 94, 0.1)); border-color: #22c55e; }
+        .stat-tag.not-purchased { background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05)); border-color: rgba(255,255,255,0.3); }
+        .stat-tag.followed { background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(59, 130, 246, 0.1)); border-color: #3b82f6; }
+        .stat-tag.not-followed { background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05)); border-color: rgba(255,255,255,0.3); }
         
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+        .content-title { font-size: 1.4em; display: flex; align-items: center; gap: 12px; }
+        .search-box input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; padding: 10px 15px; color: #fff; width: 250px; }
+        .price-table { width: 100%; border-collapse: collapse; }
+        .price-table th, .price-table td { padding: 15px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.08); vertical-align: middle; }
+        .price-table th { background: rgba(102, 126, 234, 0.15); font-weight: 600; font-size: 0.9em; }
+        .product-img { width: 120px; height: 120px; border-radius: 10px; object-fit: cover; }
+        .style-name { max-width: 180px; word-break: break-word; line-height: 1.4; }
+        .style-name a { color: #667eea; text-decoration: none; word-break: break-word; }
+        .style-name a:hover { text-decoration: underline; }
+        .new-badge { display: inline-block; background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%); color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.7em; margin-right: 5px; animation: pulse 1.5s infinite; font-weight: bold; }
+        @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.8; transform: scale(1.05); } }
+        .price { font-weight: bold; font-size: 1.1em; white-space: nowrap; }
+        .price-30d { color: #4ade80; }
+        .price-min { color: #fbbf24; cursor: pointer; text-decoration: underline; text-decoration-style: dotted; }
+        .price-min:hover { color: #f59e0b; }
+        .price-arrow { font-size: 0.9em; font-weight: bold; }
+        .price-arrow.up { color: #ef4444; }
+        .price-arrow.down { color: #22c55e; }
+        .product-title { max-width: 250px; word-break: break-word; line-height: 1.4; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 20px; padding: 30px; max-width: 900px; width: 90%; max-height: 80vh; overflow: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-title { font-size: 1.3em; display: flex; align-items: center; gap: 10px; }
+        .modal-close { background: rgba(255,255,255,0.1); border: none; color: #fff; font-size: 1.5em; cursor: pointer; padding: 5px 15px; border-radius: 10px; }
+        .modal-close:hover { background: rgba(255,255,255,0.2); }
+        .price-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .price-stat { background: rgba(255,255,255,0.05); border-radius: 10px; padding: 15px; text-align: center; }
+        .price-stat-label { font-size: 0.85em; opacity: 0.7; margin-bottom: 5px; }
+        .price-stat-value { font-size: 1.4em; font-weight: bold; }
+        .price-stat-value.min { color: #22c55e; }
+        .price-stat-value.max { color: #ef4444; }
+        .price-stat-value.current { color: #667eea; }
+        @media (max-width: 1200px) { .features { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 768px) { .header h1 { font-size: 1.8em; } .features { grid-template-columns: 1fr; } .price-table { font-size: 0.85em; } .product-img { width: 40px; height: 40px; } }
         
-        /* 顶部标题 */
-        .header {
-            text-align: center;
-            padding: 30px 0;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            border-radius: 20px;
-            margin-bottom: 30px;
-            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
-        }
-        
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-        
-        .header p {
-            opacity: 0.9;
-            font-size: 1.1em;
-        }
-        
-        /* 功能入口 */
-        .features {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .feature-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 25px 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: 2px solid transparent;
-        }
-        
-        .feature-card:hover {
-            transform: translateY(-5px);
-            border-color: #667eea;
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
-        }
-        
-        .feature-card.active {
-            border-color: #667eea;
-            background: rgba(102, 126, 234, 0.2);
-        }
-        
-        .feature-card .icon {
-            font-size: 2.5em;
-            margin-bottom: 12px;
-        }
-        
-        .feature-card h3 {
-            font-size: 1.1em;
-            margin-bottom: 6px;
-        }
-        
-        .feature-card p {
-            font-size: 0.85em;
-            opacity: 0.7;
-        }
-        
-        /* 内容展示区 */
-        .content {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 20px;
-            padding: 25px;
-            min-height: 500px;
-            backdrop-filter: blur(10px);
-        }
-        
-        .content-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .content-title {
-            font-size: 1.4em;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        /* 搜索框 */
-        .search-box {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .search-box input {
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 10px;
-            padding: 10px 15px;
-            color: #fff;
-            width: 250px;
-        }
-        
-        .search-box input::placeholder {
-            color: rgba(255,255,255,0.5);
-        }
-        
-        /* 商品表格 */
-        .price-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        .price-table th,
-        .price-table td {
-            padding: 15px;
-            text-align: left;
-            border-bottom: 1px solid rgba(255,255,255,0.08);
-            vertical-align: middle;
-        }
-        
-        .price-table th {
-            background: rgba(102, 126, 234, 0.15);
-            font-weight: 600;
-            font-size: 0.9em;
-            color: rgba(255,255,255,0.8);
-        }
-        
-        .price-table tr:hover {
-            background: rgba(255,255,255,0.03);
-        }
-        
-        /* 产品图片 */
-        .product-img {
-            width: 60px;
-            height: 60px;
-            border-radius: 10px;
-            object-fit: cover;
-            background: rgba(255,255,255,0.1);
-        }
-        
-        /* 款式名称 */
-        .style-name {
-            max-width: 180px;
-            word-break: break-word;
-            line-height: 1.4;
-        }
-        
-        .style-name a {
-            color: #667eea;
-            text-decoration: none;
-            word-break: break-word;
-        }
-        
-        .style-name a:hover {
-            text-decoration: underline;
-        }
-        
-        /* New 标签 */
-        .new-badge {
-            display: inline-block;
-            background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
-            color: #fff;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.7em;
-            margin-right: 5px;
-            animation: pulse 1.5s infinite;
-            font-weight: bold;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.8; transform: scale(1.05); }
-        }
-        
-        /* 价格样式 */
-        .price {
-            font-weight: bold;
-            font-size: 1.1em;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        
-        .price-30d {
-            color: #4ade80;
-        }
-        
-        .price-min {
-            color: #fbbf24;
-            cursor: pointer;
-            text-decoration: underline;
-            text-decoration-style: dotted;
-        }
-        
-        .price-min:hover {
-            color: #f59e0b;
-        }
-        
-        .price-arrow {
-            font-size: 0.9em;
-            font-weight: bold;
-        }
-        
-        .price-arrow.up {
-            color: #ef4444;
-        }
-        
-        .price-arrow.down {
-            color: #22c55e;
-        }
-        
-        .price-tooltip {
-            position: relative;
-            cursor: help;
-        }
-        
-        .price-tooltip::after {
-            content: attr(data-date);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.8);
-            color: #fff;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 0.8em;
-            white-space: nowrap;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s;
-        }
-        
-        .price-tooltip:hover::after {
-            opacity: 1;
-        }
-        
-        /* 产品标题 */
-        .product-title {
-            max-width: 250px;
-            word-break: break-word;
-            line-height: 1.4;
-        }
-        
-        /* 模态框 */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-        
-        .modal.show {
-            display: flex;
-        }
-        
-        .modal-content {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            border-radius: 20px;
-            padding: 30px;
-            max-width: 900px;
-            width: 90%;
-            max-height: 80vh;
-            overflow: auto;
-        }
-        
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        
-        .modal-title {
-            font-size: 1.3em;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .modal-close {
-            background: rgba(255,255,255,0.1);
-            border: none;
-            color: #fff;
-            font-size: 1.5em;
-            cursor: pointer;
-            padding: 5px 15px;
-            border-radius: 10px;
-        }
-        
-        .modal-close:hover {
-            background: rgba(255,255,255,0.2);
-        }
-        
-        /* 价格统计 */
-        .price-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .price-stat {
-            background: rgba(255,255,255,0.05);
-            border-radius: 10px;
-            padding: 15px;
-            text-align: center;
-        }
-        
-        .price-stat-label {
-            font-size: 0.85em;
-            opacity: 0.7;
-            margin-bottom: 5px;
-        }
-        
-        .price-stat-value {
-            font-size: 1.4em;
-            font-weight: bold;
-        }
-        
-        .price-stat-value.min {
-            color: #22c55e;
-        }
-        
-        .price-stat-value.max {
-            color: #ef4444;
-        }
-        
-        .price-stat-value.current {
-            color: #667eea;
-        }
-        
-        /* 响应式 */
-        @media (max-width: 1200px) {
-            .features {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .header h1 {
-                font-size: 1.8em;
-            }
-            
-            .features {
-                grid-template-columns: 1fr;
-            }
-            
-            .content-header {
-                flex-direction: column;
-                gap: 15px;
-            }
-            
-            .price-table {
-                font-size: 0.85em;
-            }
-            
-            .product-img {
-                width: 40px;
-                height: 40px;
-            }
-            
-            .price-stats {
-                grid-template-columns: 1fr;
-            }
-        }
+        /* 统计区域 */
+        .stats-section { margin-bottom: 20px; }
+        .stats-section h4 { font-size: 16px; font-weight: 600; }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- 顶部标题 -->
         <div class="header">
-            <h1>🤖 Transformers 价格追踪系统</h1>
+            <h1>Transformers 价格追踪系统</h1>
             <p>实时监控京东、天猫商品价格变化</p>
         </div>
         
-        <!-- 功能入口 -->
         <div class="features">
-            <div class="feature-card active" onclick="switchTab('jd')">
+            <div class="feature-card active" onclick="showTab('jd', this)">
                 <div class="icon">🛒</div>
                 <h3>京东价格</h3>
-                <p id="jd-count">加载中...</p>
+                <p id="jd-count">{{ jd_products|length }} 个商品</p>
             </div>
-            <div class="feature-card" onclick="switchTab('tmall')">
+            <div class="feature-card" onclick="showTab('tmall', this)">
                 <div class="icon">🏪</div>
                 <h3>天猫价格</h3>
                 <p id="tmall-count">加载中...</p>
             </div>
-            <div class="feature-card" onclick="switchTab('maintain')">
+            <div class="feature-card" onclick="window.location.href='/maintain'">
                 <div class="icon">📦</div>
                 <h3>商品维护</h3>
                 <p>添加/编辑商品</p>
             </div>
-            <div class="feature-card" onclick="switchTab('trend')">
+            <div class="feature-card" onclick="showTab('trend', this)">
                 <div class="icon">📈</div>
                 <h3>价格走势</h3>
                 <p>历史趋势分析</p>
             </div>
         </div>
         
-        <!-- 内容展示区 -->
         <div class="content">
+            <!-- 统计磁贴 - 京东 -->
+            <div id="stats-jd" class="stats-section" style="display:none;">
+                <h4 style="margin-bottom:10px;color:#667eea;">🛒 京东统计</h4>
+                <div class="stats-bar">
+                    <div class="stat-tag total">全部<span class="num" id="jd-total">0</span></div>
+                    <div class="stat-tag purchased">已购买<span class="num" id="jd-purchased">0</span></div>
+                    <div class="stat-tag not-purchased">未购买<span class="num" id="jd-not-purchased">0</span></div>
+                    <div class="stat-tag followed">已关注<span class="num" id="jd-followed">0</span></div>
+                    <div class="stat-tag not-followed">未关注<span class="num" id="jd-not-followed">0</span></div>
+                </div>
+            </div>
+            
+            <!-- 统计磁贴 - 天猫 -->
+            <div id="stats-tmall" class="stats-section" style="display:none;">
+                <h4 style="margin-bottom:10px;color:#3b82f6;">🏪 天猫统计</h4>
+                <div class="stats-bar">
+                    <div class="stat-tag total">全部<span class="num" id="tmall-total">0</span></div>
+                    <div class="stat-tag purchased">已购买<span class="num" id="tmall-purchased">0</span></div>
+                    <div class="stat-tag not-purchased">未购买<span class="num" id="tmall-not-purchased">0</span></div>
+                    <div class="stat-tag followed">已关注<span class="num" id="tmall-followed">0</span></div>
+                    <div class="stat-tag not-followed">未关注<span class="num" id="tmall-not-followed">0</span></div>
+                </div>
+            </div>
+            
             <div class="content-header">
                 <div class="content-title">
                     <span id="content-icon">🛒</span>
                     <span id="content-title">京东价格列表</span>
                 </div>
                 <div class="search-box">
-                    <input type="text" id="search-input" placeholder="搜索商品名称或ID..." oninput="filterProducts()">
+                    <input type="text" id="search-input" placeholder="搜索商品名称或ID..." onkeyup="applyKeywordFilter()">
+                    <select id="filter-purchased" onchange="filterProducts()" style="margin-left: 15px; padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2);">
+                        <option value="">全部</option>
+                        <option value="未购买" selected>未购买</option>
+                        <option value="购买">已购买</option>
+                    </select>
+                    <select id="filter-followed" onchange="filterProducts()" style="margin-left: 10px; padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2);">
+                        <option value="">全部</option>
+                        <option value="未关注">未关注</option>
+                        <option value="关注">已关注</option>
+                    </select>
                 </div>
             </div>
             
-            <!-- 表格 -->
             <table class="price-table">
                 <thead>
                     <tr>
-                        <th style="width: 80px;">图片</th>
+                        <th style="width:80px;">图片</th>
                         <th>款式名称</th>
                         <th>产品标题</th>
                         <th>创建时间</th>
@@ -463,17 +165,26 @@
                     </tr>
                 </thead>
                 <tbody id="product-list">
-                    <tr>
-                        <td colspan="8" style="text-align: center; padding: 50px; opacity: 0.6;">
-                            加载中...
+                    {% for p in jd_products %}
+                    <tr data-id="{{ p.id }}" data-source="jd" data-style="{{ p.style_name|default('', true) }}" data-title="{{ p.title|default('', true) }}">
+                        <td><img src="{{ p.image_url|default('', true) }}" class="product-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22><rect fill=%22%23333%22 width=%2260%22 height=%2260%22/><text fill=%22%23666%22 x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22>?</text></svg>'"></td>
+                        <td class="style-name">
+                            {% if p.is_new %}<span class="new-badge">NEW</span>{% endif %}
+                            <a href="{{ p.product_url|default('#', true) }}" target="_blank" title="{{ p.style_name|default('', true) }}">{{ p.style_name|default('-', true) }}</a>
                         </td>
+                        <td class="product-title" title="{{ p.title|default('', true) }}">{{ p.title|default('-', true) }}</td>
+                        <td>{{ p.created_at_display }}</td>
+                        <td>{{ p.shop_name|default('-', true) }}</td>
+                        <td class="price price-30d">{% if p.min_price_30d %}¥{{ "%.2f"|format(p.min_price_30d) }}{% else %}-{% endif %}</td>
+                        <td class="price price-tooltip" data-date="{{ p.latest_date|default('', true) }}">{% if p.min_price_30d and p.latest_price and p.latest_price > p.min_price_30d %}↓{% elif p.min_price_30d and p.latest_price and p.latest_price < p.min_price_30d %}↑{% endif %}{% if p.latest_price %}¥{{ "%.2f"|format(p.latest_price) }}{% else %}-{% endif %}</td>
+                        <td class="price price-min" onclick="showPriceHistory({{ p.id }}, 'jd')">{% if p.min_price_all %}¥{{ "%.2f"|format(p.min_price_all) }}{% else %}-{% endif %}</td>
                     </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
     
-    <!-- 价格历史模态框 -->
     <div class="modal" id="price-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -484,7 +195,6 @@
                 <button class="modal-close" onclick="closeModal()">×</button>
             </div>
             
-            <!-- 价格统计 -->
             <div class="price-stats">
                 <div class="price-stat">
                     <div class="price-stat-label">历史最低</div>
@@ -500,282 +210,377 @@
                 </div>
             </div>
             
-            <!-- 图表 -->
-            <canvas id="price-chart" style="max-height: 400px;"></canvas>
+            <canvas id="price-chart" style="max-height:400px;"></canvas>
         </div>
     </div>
     
     <script>
-        let currentTab = 'jd';
-        let allProducts = [];
-        let priceChart = null;
-        
-        // 切换标签
-        function switchTab(tab) {
-            currentTab = tab;
-            
-            document.querySelectorAll('.feature-card').forEach(card => {
-                card.classList.remove('active');
+    var currentTab = 'jd';
+    var priceChart = null;
+    var allProducts = { jd: [], tmall: [] };
+    var filteredProducts = { jd: [], tmall: [] };
+    
+    function showTab(tab, el) {
+        currentTab = tab;
+        var cards = document.querySelectorAll('.feature-card');
+        for (var i = 0; i < cards.length; i++) {
+            cards[i].classList.remove('active');
+        }
+        if (el) {
+            el.classList.add('active');
+        } else {
+            // 页面加载时根据 tab 设置 active
+            cards.forEach(function(card) {
+                if (tab === 'jd' && card === cards[0]) card.classList.add('active');
+                else if (tab === 'tmall' && card === cards[1]) card.classList.add('active');
             });
-            event.currentTarget.classList.add('active');
-            
-            const titles = {
-                'jd': { icon: '🛒', text: '京东价格列表' },
-                'tmall': { icon: '🏪', text: '天猫价格列表' },
-                'maintain': { icon: '📦', text: '商品维护' },
-                'trend': { icon: '📈', text: '价格走势分析' }
+        }
+        
+        var titles = {
+            'jd': {icon: '🛒', text: '京东价格列表'},
+            'tmall': {icon: '🏪', text: '天猫价格列表'},
+            'maintain': {icon: '📦', text: '商品维护'},
+            'trend': {icon: '📈', text: '价格走势分析'}
+        };
+        
+        document.getElementById('content-icon').textContent = titles[tab].icon;
+        document.getElementById('content-title').textContent = titles[tab].text;
+        
+        // 显示/隐藏对应的磁贴统计
+        document.getElementById('stats-jd').style.display = tab === 'jd' ? 'block' : 'none';
+        document.getElementById('stats-tmall').style.display = tab === 'tmall' ? 'block' : 'none';
+        
+        if (tab === 'jd') {
+            document.getElementById('filter-purchased').value = '未购买';
+            filterProducts();
+        } else if (tab === 'tmall') {
+            document.getElementById('filter-purchased').value = '';
+            filterProducts();
+        } else if (tab === 'maintain' || tab === 'trend') {
+            document.getElementById('product-list').innerHTML = '<tr><td colspan="8" style="text-align:center;padding:50px;">功能开发中...</td></tr>';
+        }
+    }
+    
+    function filterProducts() {
+        var keyword = document.getElementById('search-input').value.toLowerCase();
+        var purchased = document.getElementById('filter-purchased').value;
+        var followed = document.getElementById('filter-followed').value;
+        
+        console.log('filterProducts called, tab:', currentTab, 'purchased:', purchased);
+        
+        if (currentTab === 'jd') {
+            var xhr = new XMLHttpRequest();
+            var url = '/api/jd-prices?purchased=' + encodeURIComponent(purchased) + '&followed=' + encodeURIComponent(followed);
+            xhr.open('GET', url, true);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try {
+                        var products = JSON.parse(xhr.responseText);
+                        console.log('京东数据加载:', products.length, '个');
+                        allProducts.jd = products;  // 保存原始数据
+                        filteredProducts.jd = products;
+                        applyKeywordFilter('jd', keyword);
+                    } catch (e) {
+                        console.error('Error:', e);
+                    }
+                }
             };
-            
-            document.getElementById('content-icon').textContent = titles[tab].icon;
-            document.getElementById('content-title').textContent = titles[tab].text;
-            
-            loadProducts(tab);
-        }
-        
-        // 加载商品数据
-        async function loadProducts(tab) {
-            const tbody = document.getElementById('product-list');
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 50px;">加载中...</td></tr>';
-            
-            try {
-                if (tab === 'jd') {
-                    const res = await fetch('/api/jd-prices');
-                    allProducts = await res.json();
-                    renderProducts(allProducts);
-                    document.getElementById('jd-count').textContent = allProducts.length + ' 个商品';
-                } else if (tab === 'tmall') {
-                    const res = await fetch('/api/tmall-prices');
-                    allProducts = await res.json();
-                    renderProducts(allProducts);
-                    document.getElementById('tmall-count').textContent = allProducts.length + ' 个商品';
-                } else {
-                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 50px;">功能开发中...</td></tr>';
-                }
-            } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 50px; color: #f5576c;">加载失败: ' + e.message + '</td></tr>';
-            }
-        }
-        
-        // 渲染商品列表
-        function renderProducts(products) {
-            const tbody = document.getElementById('product-list');
-            
-            if (products.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 50px; opacity: 0.6;">暂无数据</td></tr>';
-                return;
-            }
-            
-            tbody.innerHTML = products.map(p => {
-                const newBadge = p.is_new ? '<span class="new-badge">NEW</span>' : '';
-                
-                // 价格箭头
-                let arrowHtml = '';
-                if (p.latest_price && p.min_price_30d) {
-                    if (p.latest_price > p.min_price_30d) {
-                        // 最新价格高于30日最低 = 下跌了 = 绿色下降箭头
-                        arrowHtml = '<span class="price-arrow down">↓</span>';
-                    } else if (p.latest_price < p.min_price_30d) {
-                        // 最新价格低于30日最低 = 上涨了 = 红色上升箭头
-                        arrowHtml = '<span class="price-arrow up">↑</span>';
+            xhr.send();
+        } else if (currentTab === 'tmall') {
+            var xhr = new XMLHttpRequest();
+            var url = '/api/tmall-prices?purchased=' + encodeURIComponent(purchased) + '&followed=' + encodeURIComponent(followed);
+            xhr.open('GET', url, true);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try {
+                        var products = JSON.parse(xhr.responseText);
+                        console.log('天猫数据加载:', products.length, '个');
+                        allProducts.tmall = products;  // 保存原始数据
+                        filteredProducts.tmall = products;
+                        applyKeywordFilter('tmall', keyword);
+                    } catch (e) {
+                        console.error('Error:', e);
                     }
                 }
-                
-                const latestPrice = p.latest_price ? '¥' + p.latest_price.toFixed(2) : '-';
-                const min30dPrice = p.min_price_30d ? '¥' + p.min_price_30d.toFixed(2) : '-';
-                const minAllPrice = p.min_price_all ? '¥' + p.min_price_all.toFixed(2) : '-';
-                
-                const imgUrl = p.image_url || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60"><rect fill="%23333" width="60" height="60"/><text fill="%23666" x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="20">?</text></svg>';
-                
-                const createdAt = (p.created_at && typeof p.created_at === 'string') ? p.created_at.substring(0, 10) : '-';
-                
-                const safeStyleName = (p.style_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                const safeTitle = (p.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                
-                return `
-                    <tr>
-                        <td><img src="${imgUrl}" class="product-img" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22><rect fill=%22%23333%22 width=%2260%22 height=%2260%22/><text fill=%22%23666%22 x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22>?</text></svg>'"></td>
-                        <td class="style-name">
-                            ${newBadge}
-                            <a href="${p.product_url}" target="_blank" title="${safeStyleName}">${safeStyleName || '-'}</a>
-                        </td>
-                        <td class="product-title" title="${safeTitle}">${safeTitle || '-'}</td>
-                        <td>${createdAt}</td>
-                        <td>${(p.shop_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
-                        <td class="price price-30d">${min30dPrice}</td>
-                        <td class="price price-tooltip" data-date="${p.latest_date || ''}">${arrowHtml} ${latestPrice}</td>
-                        <td class="price price-min" onclick="showPriceHistory(${p.id}, '${currentTab}')">${minAllPrice}</td>
-                    </tr>
-                `;
-            }).join('');
+            };
+            xhr.send();
         }
+    }
+    
+    function applyKeywordFilter(source, keyword) {
+        var products = filteredProducts[source] || [];
         
-        // 搜索过滤
-        function filterProducts() {
-            const keyword = document.getElementById('search-input').value.toLowerCase();
-            
-            if (!keyword) {
-                renderProducts(allProducts);
-                return;
-            }
-            
-            const filtered = allProducts.filter(p => {
-                return (p.style_name && p.style_name.toLowerCase().includes(keyword)) ||
-                       (p.title && p.title.toLowerCase().includes(keyword)) ||
-                       (p.product_id && p.product_id.toLowerCase().includes(keyword));
+        // 关键字筛选（只对列表显示有效）
+        if (keyword) {
+            products = products.filter(function(p) {
+                var style = (p.style_name || '').toLowerCase();
+                var title = (p.title || '').toLowerCase();
+                var productId = (p.product_id || '').toLowerCase();
+                return style.indexOf(keyword) !== -1 || title.indexOf(keyword) !== -1 || productId.indexOf(keyword) !== -1;
             });
-            
-            renderProducts(filtered);
         }
         
-        // 显示价格历史
-        async function showPriceHistory(productId, source) {
-            const modal = document.getElementById('price-modal');
-            const modalIcon = document.getElementById('modal-icon');
-            const modalTitle = document.getElementById('modal-title');
-            const statMin = document.getElementById('stat-min');
-            const statCurrent = document.getElementById('stat-current');
-            const statMax = document.getElementById('stat-max');
+        renderProducts(products, source);
+    }
+    
+    function renderProducts(products, source) {
+        var tbody = document.getElementById('product-list');
+        
+        if (!products || products.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:50px;opacity:0.6;">暂无数据</td></tr>';
+            return;
+        }
+        
+        var html = '';
+        var threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+        var threeDaysAgoStr = threeDaysAgo.toISOString().slice(0, 10);
+        
+        var html = '';
+        for (var i = 0; i < products.length; i++) {
+            var p = products[i];
             
-            modalIcon.textContent = source === 'jd' ? '🛒' : '🏪';
-            modalTitle.textContent = source === 'jd' ? '京东价格走势' : '天猫价格走势';
+            var isNew = false;
+            if (p.created_at && p.created_at.slice) {
+                var createdDate = p.created_at.slice(0, 10);
+                if (createdDate >= threeDaysAgoStr) isNew = true;
+            }
+            var newBadge = isNew ? '<span class="new-badge">NEW</span>' : '';
             
-            modal.classList.add('show');
+            var min30dPrice = p.min_price_30d ? '¥' + parseFloat(p.min_price_30d).toFixed(2) : '-';
+            var latestPrice = p.latest_price ? '¥' + parseFloat(p.latest_price).toFixed(2) : '-';
+            var minAllPrice = p.min_price_all ? '¥' + parseFloat(p.min_price_all).toFixed(2) : '-';
             
-            try {
-                const res = await fetch(`/api/price-history/${productId}?source=${source}`);
-                const history = await res.json();
-                
-                if (history.length === 0) {
-                    statMin.textContent = '-';
-                    statCurrent.textContent = '-';
-                    statMax.textContent = '-';
-                    if (priceChart) {
-                        priceChart.destroy();
-                        priceChart = null;
+            var imgUrl = (p.image_url || '').replace(/&/g, '&amp;');
+            var createdAt = (p.created_at_display || '-');
+            var safeStyleName = (p.style_name || '-').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            var safeTitle = (p.title || '-').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            var safeShopName = (p.shop_name || '-').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            var productUrl = (p.product_url || '#').replace(/&/g, '&amp;');
+            var safeLatestDate = p.latest_date || '';
+            
+            html += '<tr data-id="' + p.id + '" data-source="' + source + '" data-style="' + (p.style_name || '') + '" data-title="' + (p.title || '') + '">';
+            html += '<td><img src="' + imgUrl + '" class="product-img" onerror="this.src=\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22120%22><rect fill=%22%23333%22 width=%22120%22 height=%22120%22/><text fill=%22%23666%22 x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22>?</text></svg>\'"></td>';
+            html += '<td class="style-name">' + newBadge + '<a href="' + productUrl + '" target="_blank" title="' + safeStyleName + '">' + safeStyleName + '</a></td>';
+            html += '<td class="product-title" title="' + safeTitle + '">' + safeTitle + '</td>';
+            html += '<td>' + createdAt + '</td>';
+            html += '<td>' + safeShopName + '</td>';
+            html += '<td class="price price-30d">' + min30dPrice + '</td>';
+            html += '<td class="price price-tooltip" data-date="' + safeLatestDate + '">' + latestPrice + '</td>';
+            html += '<td class="price price-min" onclick="showPriceHistory(' + p.id + ', \'' + source + '\')">' + minAllPrice + '</td>';
+            html += '</tr>';
+        }
+        
+        if (!html) {
+            html = '<tr><td colspan="8" style="text-align:center;padding:50px;opacity:0.6;">暂无数据</td></tr>';
+        }
+        
+        tbody.innerHTML = html;
+    }
+    
+    // 更新磁贴统计（不受筛选影响）
+    function updateStats(products, prefix) {
+        if (!products || products.length === 0) {
+            document.getElementById(prefix + '-total').textContent = '0';
+            document.getElementById(prefix + '-purchased').textContent = '0';
+            document.getElementById(prefix + '-not-purchased').textContent = '0';
+            document.getElementById(prefix + '-followed').textContent = '0';
+            document.getElementById(prefix + '-not-followed').textContent = '0';
+            return;
+        }
+        
+        var total = products.length;
+        var purchased = products.filter(function(p) { return p.is_purchased === '购买'; }).length;
+        var notPurchased = products.filter(function(p) { return p.is_purchased === '未购买'; }).length;
+        var followed = products.filter(function(p) { return p.is_followed === '关注'; }).length;
+        var notFollowed = products.filter(function(p) { return p.is_followed === '未关注'; }).length;
+        
+        document.getElementById(prefix + '-total').textContent = total;
+        document.getElementById(prefix + '-purchased').textContent = purchased;
+        document.getElementById(prefix + '-not-purchased').textContent = notPurchased;
+        document.getElementById(prefix + '-followed').textContent = followed;
+        document.getElementById(prefix + '-not-followed').textContent = notFollowed;
+    }
+    
+    function showPriceHistory(productId, source) {
+        var modal = document.getElementById('price-modal');
+        var modalIcon = document.getElementById('modal-icon');
+        var modalTitle = document.getElementById('modal-title');
+        
+        modalIcon.textContent = source === 'jd' ? '🛒' : '🏪';
+        modalTitle.textContent = source === 'jd' ? '京东价格走势' : '天猫价格走势';
+        
+        modal.classList.add('show');
+        
+        document.getElementById('stat-min').textContent = '-';
+        document.getElementById('stat-current').textContent = '-';
+        document.getElementById('stat-max').textContent = '-';
+        
+        if (priceChart) {
+            priceChart.destroy();
+            priceChart = null;
+        }
+        
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/price-history/' + productId + '?source=' + source, true);
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                try {
+                    var history = JSON.parse(xhr.responseText);
+                    
+                    if (!history || history.length === 0) return;
+                    
+                    var prices = [];
+                    for (var i = 0; i < history.length; i++) {
+                        if (history[i].price) prices.push(parseFloat(history[i].price));
                     }
-                    return;
-                }
-                
-                // 计算统计数据
-                const prices = history.map(h => h.price).filter(p => p);
-                const minPrice = prices.length ? Math.min(...prices) : null;
-                const maxPrice = prices.length ? Math.max(...prices) : null;
-                const currentPrice = history[0]?.price || null;
-                
-                statMin.textContent = minPrice ? '¥' + minPrice.toFixed(2) : '-';
-                statCurrent.textContent = currentPrice ? '¥' + currentPrice.toFixed(2) : '-';
-                statMax.textContent = maxPrice ? '¥' + maxPrice.toFixed(2) : '-';
-                
-                // 绘制图表
-                const ctx = document.getElementById('price-chart').getContext('2d');
-                
-                if (priceChart) {
-                    priceChart.destroy();
-                }
-                
-                const labels = history.map(h => {
-                    if (h.created_at) {
-                        return h.created_at.substring(0, 4) + '-' + h.created_at.substring(4, 6) + '-' + h.created_at.substring(6, 8);
-                    }
-                    return '-';
-                });
-                
-                const data = history.map(h => h.price);
-                const styleNames = history.map(h => h.style_name || '');
-                
-                priceChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: '价格',
-                            data: data,
-                            borderColor: '#667eea',
-                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                            fill: true,
-                            tension: 0.3,
-                            pointRadius: 5,
-                            pointBackgroundColor: data.map((price, i) => {
-                                if (price === minPrice) return '#22c55e';
-                                if (price === maxPrice) return '#ef4444';
-                                return '#667eea';
-                            }),
-                            pointBorderColor: data.map((price, i) => {
-                                if (price === minPrice) return '#22c55e';
-                                if (price === maxPrice) return '#ef4444';
-                                return '#667eea';
-                            })
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    afterLabel: function(context) {
-                                        const styleName = styleNames[context.dataIndex];
-                                        return styleName ? '款式: ' + styleName : '';
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: false,
-                                grid: {
-                                    color: 'rgba(255,255,255,0.1)'
-                                },
-                                ticks: {
-                                    color: 'rgba(255,255,255,0.7)',
-                                    callback: function(value) {
-                                        return '¥' + value.toFixed(0);
-                                    }
-                                }
-                            },
-                            x: {
-                                grid: {
-                                    color: 'rgba(255,255,255,0.1)'
-                                },
-                                ticks: {
-                                    color: 'rgba(255,255,255,0.7)'
-                                }
-                            }
+                    
+                    var minPrice = prices.length ? Math.min.apply(null, prices) : null;
+                    var maxPrice = prices.length ? Math.max.apply(null, prices) : null;
+                    var currentPrice = history[0] && history[0].price ? parseFloat(history[0].price) : null;
+                    
+                    document.getElementById('stat-min').textContent = minPrice ? '¥' + minPrice.toFixed(2) : '-';
+                    document.getElementById('stat-current').textContent = currentPrice ? '¥' + currentPrice.toFixed(2) : '-';
+                    document.getElementById('stat-max').textContent = maxPrice ? '¥' + maxPrice.toFixed(2) : '-';
+                    
+                    var ctx = document.getElementById('price-chart').getContext('2d');
+                    
+                    var labels = [];
+                    for (var i = 0; i < history.length; i++) {
+                        if (history[i].created_at && history[i].created_at.length >= 8) {
+                            labels.push(history[i].created_at.slice(0, 4) + '-' + history[i].created_at.slice(4, 6) + '-' + history[i].created_at.slice(6, 8));
+                        } else {
+                            labels.push('-');
                         }
                     }
-                });
-                
-            } catch (e) {
-                console.error('加载价格历史失败:', e);
+                    
+                    var data = [];
+                    for (var i = 0; i < history.length; i++) {
+                        data.push(history[i].price);
+                    }
+                    
+                    var minVal = minPrice;
+                    var maxVal = maxPrice;
+                    
+                    priceChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: '价格',
+                                data: data,
+                                borderColor: '#667eea',
+                                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 5,
+                                pointBackgroundColor: data.map(function(price) {
+                                    if (price === minVal) return '#22c55e';
+                                    if (price === maxVal) return '#ef4444';
+                                    return '#667eea';
+                                }),
+                                pointBorderColor: data.map(function(price) {
+                                    if (price === minVal) return '#22c55e';
+                                    if (price === maxVal) return '#ef4444';
+                                    return '#667eea';
+                                })
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: {
+                                    beginAtZero: false,
+                                    grid: { color: 'rgba(255,255,255,0.1)' },
+                                    ticks: { color: 'rgba(255,255,255,0.7)', callback: function(value) { return '¥' + value.toFixed(0); } }
+                                },
+                                x: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'rgba(255,255,255,0.7)' } }
+                            }
+                        }
+                    });
+                } catch (e) {
+                    console.error('Error:', e);
+                }
             }
-        }
+        };
+        xhr.send();
+    }
+    
+    function closeModal() {
+        document.getElementById('price-modal').classList.remove('show');
+    }
+    
+    document.getElementById('price-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+    
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeModal();
+    });
+    
+    // 页面加载时加载数据
+    window.onload = function() {
+        // 初始化显示京东（会同时加载数据）
+        showTab('jd');
         
-        // 关闭模态框
-        function closeModal() {
-            document.getElementById('price-modal').classList.remove('show');
-        }
-        
-        // 点击背景关闭
-        document.getElementById('price-modal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeModal();
+        // 预加载天猫数据（后台加载）
+        var tmallXhr = new XMLHttpRequest();
+        tmallXhr.open('GET', '/api/tmall-prices', true);
+        tmallXhr.onload = function() {
+            if (tmallXhr.status === 200) {
+                try {
+                    var products = JSON.parse(tmallXhr.responseText);
+                    allProducts.tmall = products;
+                    filteredProducts.tmall = products;
+                } catch (e) {
+                    console.error('Error:', e);
+                }
             }
-        });
+        };
+        tmallXhr.send();
         
-        // ESC关闭
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeModal();
+        // 加载京东统计数据（不受筛选影响）
+        var jdStatsXhr = new XMLHttpRequest();
+        jdStatsXhr.open('GET', '/api/jd-stats', true);
+        jdStatsXhr.onload = function() {
+            if (jdStatsXhr.status === 200) {
+                try {
+                    var stats = JSON.parse(jdStatsXhr.responseText);
+                    document.getElementById('jd-count').textContent = stats.total + ' 个商品';
+                    document.getElementById('jd-total').textContent = stats.total;
+                    document.getElementById('jd-purchased').textContent = stats.purchased;
+                    document.getElementById('jd-not-purchased').textContent = stats.not_purchased;
+                    document.getElementById('jd-followed').textContent = stats.followed;
+                    document.getElementById('jd-not-followed').textContent = stats.not_followed;
+                } catch (e) {
+                    console.error('Error loading jd stats:', e);
+                }
             }
-        });
+        };
+        jdStatsXhr.send();
         
-        // 初始化
-        document.addEventListener('DOMContentLoaded', () => {
-            loadProducts('jd');
-        });
+        // 加载天猫统计数据（不受筛选影响）
+        var tmallStatsXhr = new XMLHttpRequest();
+        tmallStatsXhr.open('GET', '/api/tmall-stats', true);
+        tmallStatsXhr.onload = function() {
+            if (tmallStatsXhr.status === 200) {
+                try {
+                    var stats = JSON.parse(tmallStatsXhr.responseText);
+                    document.getElementById('tmall-count').textContent = stats.total + ' 个商品';
+                    document.getElementById('tmall-total').textContent = stats.total;
+                    document.getElementById('tmall-purchased').textContent = stats.purchased;
+                    document.getElementById('tmall-not-purchased').textContent = stats.not_purchased;
+                    document.getElementById('tmall-followed').textContent = stats.followed;
+                    document.getElementById('tmall-not-followed').textContent = stats.not_followed;
+                } catch (e) {
+                    console.error('Error loading tmall stats:', e);
+                }
+            }
+        };
+        tmallStatsXhr.send();
+    };
     </script>
 </body>
 </html>
