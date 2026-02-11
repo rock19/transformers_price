@@ -9,9 +9,12 @@ import time
 import random
 import json
 import re
+import os
 from datetime import datetime
 
-DB_PATH = 'data/transformers.db'
+# 使用绝对路径，确保从任何目录运行都能正确找到数据库
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE_DIR, 'data', 'transformers.db')
 BASE_URL = 'https://mall.jd.com/view_search-396211-17821117-99-1-20-{}.html'
 
 

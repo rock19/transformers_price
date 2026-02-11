@@ -18,9 +18,11 @@ import json
 from datetime import datetime
 from fontTools.ttLib import TTFont
 
-DB_PATH = '../data/transformers.db'
-FONT_PATH = '../data/fonts/tmall_price.woff'
-COOKIE_PATH = '../data/tmall_cookies.json'
+# 使用绝对路径，确保从任何目录运行都能正确找到数据库
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE_DIR, 'data', 'transformers.db')
+FONT_PATH = os.path.join(BASE_DIR, 'data', 'fonts', 'tmall_price.woff')
+COOKIE_PATH = os.path.join(BASE_DIR, 'data', 'tmall_cookies.json')
 
 PAGE1_URL = "https://thetransformers.tmall.com/category.htm?spm=a1z10.3-b.w5001-22116109517.10.77742409X6wOMa&search=y&orderType=hotsell_desc&scene=taobao_shop"
 PAGE2_URL = "https://thetransformers.tmall.com/category.htm?spm=a1z10.3-b.w4011-22116109545.508.5ecd2409eajMbv&search=y&orderType=hotsell_desc&scene=taobao_shop&pageNo=2"
