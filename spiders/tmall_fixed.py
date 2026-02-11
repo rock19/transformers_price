@@ -18,9 +18,9 @@ import json
 from datetime import datetime
 from fontTools.ttLib import TTFont
 
-DB_PATH = 'data/transformers.db'
-FONT_PATH = 'data/fonts/tmall_price.woff'
-COOKIE_PATH = 'data/tmall_cookies.json'
+DB_PATH = '../data/transformers.db'
+FONT_PATH = '../data/fonts/tmall_price.woff'
+COOKIE_PATH = '../data/tmall_cookies.json'
 
 PAGE1_URL = "https://thetransformers.tmall.com/category.htm?spm=a1z10.3-b.w5001-22116109517.10.77742409X6wOMa&search=y&orderType=hotsell_desc&scene=taobao_shop"
 PAGE2_URL = "https://thetransformers.tmall.com/category.htm?spm=a1z10.3-b.w4011-22116109545.508.5ecd2409eajMbv&search=y&orderType=hotsell_desc&scene=taobao_shop&pageNo=2"
@@ -82,7 +82,11 @@ tell application "Safari"
     set js to do shell script "cat " & quoted form of jsFile
     try
         set theResult to do JavaScript js in current tab of front window
-        return theResult
+        if theResult is missing value then
+            return "OK"
+        else
+            return theResult
+        end if
     on error errMsg
         return "ERROR:" & errMsg
     end try
@@ -95,12 +99,17 @@ AS'''
 
 def open_url(url):
     """打开URL"""
-    # 先确保Safari已打开
+    # 确保Safari已打开
     subprocess.run(['open', '-a', 'Safari'])
     time.sleep(3)
     
+    # 创建新文档
+    subprocess.run(['osascript', '-e', 'tell application "Safari" to make new document'])
+    time.sleep(2)
+    
     # 设置URL
     subprocess.run(['osascript', '-e', f'tell application "Safari" to set URL of front document to "{url}"'])
+    print(f"✅ 已打开: {url[:60]}...")
 
 
 def close_safari():
@@ -112,13 +121,24 @@ def close_safari():
 def scroll_to_bottom(scroll_steps=50):
     """滚动到底部（分N步，逐步加载图片 - 参考京东爬虫）"""
     step = 0
+    
+    # 先滚动到顶部
+    run_js('window.scrollTo(0, 0)')
+    time.sleep(2)
+    
     for i in range(scroll_steps):
         step += 1
-        run_js('window.scrollBy(0, 200)')  # 每次滚动200像素
+        result = run_js('window.scrollBy(0, 500)')  # 每次滚动500像素
+        
+        # 检查是否滚动失败
+        if result.startswith('ERROR'):
+            print(f"      ⚠️ 滚动失败: {result}")
+        
         time.sleep(1.5)  # 等待1.5秒
         
         # 每步打印进度
-        print(f"      滚动 {step}/{scroll_steps}")
+        if step % 10 == 0 or step == scroll_steps:
+            print(f"      滚动 {step}/{scroll_steps}")
     
     # 滚动回顶部
     time.sleep(3)  # 等待页面完全加载
@@ -164,47 +184,30 @@ def get_products():
     """获取商品"""
     js = '''var products = [];
 var items = document.querySelectorAll("[data-id]");
-console.log("找到 " + items.length + " 个商品");
+console.log("Found " + items.length + " items");
 
 for(var i=0; i<items.length; i++) {
     var item = items[i];
     var pid = item.getAttribute("data-id");
     if(!pid) continue;
     
-    // 查找链接
     var link = item.querySelector("a[href*='item']");
     if(!link) link = item.querySelector("a");
     var url = link ? link.href : "";
     if(!url || url.indexOf("item") < 0) continue;
     
-    // 查找图片 - 优先从photo class
-    var photoDiv = item.querySelector(".photo");
-    var img = photoDiv ? photoDiv.querySelector("img") : null;
-    if(!img) img = item.querySelector("img");
-    var imgUrl = img ? (img.src || img.getAttribute("data-src") || "") : "";
-    
-    // 只保留.jpg结尾的图片URL
-    if(imgUrl && !imgUrl.endsWith(".jpg") && !imgUrl.endsWith(".JPG")) {
-        imgUrl = "";
-    }
-    
     // 获取标题
+    var img = item.querySelector("img");
     var title = img ? (img.alt || img.title || "") : "";
     
-    // 获取价格
-    var priceElem = item.querySelector(".c-price") || item.querySelector("[class*='price']");
+    var priceElem = item.querySelector(".c-price");
     var encryptedPrice = priceElem ? priceElem.innerText.trim() : "";
     
     if(encryptedPrice) {
-        // 提取款式名称（去掉【】及括号内容、去掉"变形金刚"）
-        var styleName = title.replace(/变形金刚/g, "").replace(/【[^】]*】/g, "").replace(/\([^)]*\)/g, "").replace(/\（[^）]*\）/g, "").trim();
-        
         products.push({
             id: pid, 
             url: url, 
-            img: imgUrl, 
-            title: title, 
-            styleName: styleName,
+            title: title,
             encryptedPrice: encryptedPrice
         });
     }
@@ -264,110 +267,150 @@ def extract_level(title):
 
 
 def save_products(products, page_name, page_url):
-    """保存商品（去重：根据product_url和title）"""
+    """保存商品
+    规则：
+    1. 过滤尾款/预售/定金类商品（不入库）
+    2. 根据商品URL中的id查询商品表（product_id）
+    3. 存在则更新；不存在则跳过
+    4. 历史价格表：根据 product_id + 日期查询，有则更新，没有则插入
+    """
     if not products:
         return 0
     
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    new_count = 0
+    updated_count = 0
     today = datetime.now().strftime('%Y%m%d')
     
+    # 过滤尾款/预售/定金类商品
+    PRESALE_KEYWORDS = ['尾款', '预售', '定金', '预付', '预订', '全款预售']
+    original_count = len(products)
+    products = [p for p in products if not any(kw in p.get('title', '') for kw in PRESALE_KEYWORDS)]
+    filtered_count = original_count - len(products)
+    
+    if filtered_count > 0:
+        print(f"  🚫 过滤掉 {filtered_count} 个尾款/预售类商品")
+    
     for i, p in enumerate(products, 1):
-        print(f"  [{i}/{len(products)}] {p['id']}")
+        url = p.get('url', '')
         
-        # 过滤【尾款专属链接】
-        title = p.get('title', '')
-        if '【尾款专属链接】' in title:
-            print(f"     ⏭️ 跳过（尾款专属）")
+        # 从URL中提取id
+        match = re.search(r'id=(\d+)', url)
+        if not match:
+            print(f"  [{i}/{len(products)}] ❌ URL格式错误")
             continue
         
-        # 根据product_id去重（最重要）
-        cursor.execute("SELECT id FROM tmall_products WHERE product_id=?", (p['id'],))
-        if cursor.fetchone():
-            print(f"     ⏭️ 已存在（product_id重复）")
-            continue
+        product_id_from_url = match.group(1)
+        print(f"  [{i}/{len(products)}] ID:{product_id_from_url}...", end='')
         
+        # 解密价格
         price = decrypt_price(p.get('encryptedPrice', ''))
         if price == 0:
-            print(f"     ❌ 解密失败")
-            continue
+            print(f" ⚠️ 价格解密失败，继续...")
+        else:
+            print(f" ¥{price}")
         
-        level = extract_level(p.get('title', ''))
-        style_name = extract_style_name(p.get('title', ''))
+        # 根据 id 查询商品表
+        cursor.execute("SELECT id, price FROM tmall_products WHERE product_id = ?", (product_id_from_url,))
+        row = cursor.fetchone()
         
-        print(f"     ✅ ¥{price} | {style_name} | {'🏷️'+level if level else ''}")
-        
-        try:
+        if row:
+            db_id = row[0]
+            old_price = row[1]
+            
+            # 更新商品价格
+            if old_price != price:
+                cursor.execute("UPDATE tmall_products SET price=?, updated_at=? WHERE id=?",
+                            (price, datetime.now().isoformat(), db_id))
+                print(f" ✅ ¥{price} (¥{old_price}→¥{price})")
+            else:
+                print(f" ✅ ¥{price} (未变)")
+            
+            # 历史价格表：根据 product_id + 日期查询
+            cursor.execute("SELECT id FROM tmall_price_history WHERE product_id = ? AND created_at = ?", 
+                        (db_id, today))
+            if cursor.fetchone():
+                cursor.execute("UPDATE tmall_price_history SET price=? WHERE product_id=? AND created_at=?",
+                            (price, db_id, today))
+                print(f"    📜 更新历史")
+            else:
+                cursor.execute("INSERT INTO tmall_price_history (product_id, product_url, price, style_name, created_at) VALUES (?, ?, ?, ?, ?)",
+                            (db_id, url, price, '', today))
+                print(f"    📜 新增历史")
+            
+            updated_count += 1
+        else:
+            # 商品不存在，插入新记录（即使价格解密失败也要保存）
+            title = p.get('title', '')[:500]
+            style_name = extract_style_name(title)
+            level = extract_level(title)
+            
             cursor.execute("""
                 INSERT INTO tmall_products 
-                    (product_id, product_url, image_url, title, price, preprice, style_name, status, 
-                     is_deposit, created_at, updated_at, shop_name, shop_url, is_purchased, is_followed, level)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (product_id, product_url, title, price, status, shop_name, shop_url, level, style_name, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                p['id'], p['url'], p.get('img', ''), p.get('title', '')[:500], price, '', style_name, 'available',
-                0, datetime.now().isoformat(), datetime.now().isoformat(),
-                '变形金刚玩具旗舰店', page_url, '否', '否', level
+                product_id_from_url, url, title,
+                price, "available",
+                "变形金刚玩具旗舰店", url,
+                level, style_name,
+                datetime.now().isoformat(), datetime.now().isoformat()
             ))
-            
-            cursor.execute("SELECT id FROM tmall_products WHERE product_id=?", (p['id'],))
-            row_id = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT id FROM tmall_price_history WHERE product_id=? AND created_at=?", (row_id, today))
-            if not cursor.fetchone():
-                cursor.execute("INSERT INTO tmall_price_history VALUES (?, ?, ?, ?, ?, ?)",
-                            (None, row_id, p['url'], price, style_name, today))
-            
             conn.commit()
-            new_count += 1
-        except Exception as e:
-            print(f"     ❌ 保存失败: {e}")
+            
+            if price > 0:
+                print(f" ✅ ¥{price} 🆕")
+            else:
+                print(f" ⚠️ 价格解密失败 🆕")
+            
+            # 新商品也记录历史
+            if price > 0:
+                cursor.execute("SELECT id FROM tmall_products WHERE product_id = ?", (product_id_from_url,))
+                new_row = cursor.fetchone()
+                if new_row:
+                    cursor.execute("INSERT INTO tmall_price_history (product_id, product_url, price, style_name, created_at) VALUES (?, ?, ?, ?, ?)",
+                                (new_row[0], url, price, '', today))
+                    print(f"    📜 新增历史")
+            
+            updated_count += 1
     
+    conn.commit()
     conn.close()
-    return new_count
+    return updated_count
 
 
-def crawl_page(url, page_name, scroll_steps=30):
-    """爬取单页"""
+def crawl_one_page(url, page_name, scroll_steps):
+    """爬取单页（打开Safari → 下载字体 → 滚动 → 爬数据 → 关闭Safari）"""
     print(f"\n{'='*60}")
-    print(f"📄 {page_name}")
+    print(f"📄 {page_name}: {url[:60]}...")
     print("="*60)
     
-    # 打开页面
-    print(f"🔗 打开页面...")
+    # 1. 打开Safari，输入网址
+    print(f"🔗 打开Safari，输入网址...")
     open_url(url)
     time.sleep(30)  # 等待页面加载
     
-    # 尝试加载cookie
-    load_cookies()
-    time.sleep(10)  # 等待cookie加载
+    # 确认页面已打开
+    result = run_js('document.URL')
+    print(f"✅ 当前页面: {result[:80]}...")
     
-    # 检测登录
-    if is_login_page():
-        print("⚠️ 检测到登录页面！")
-        print("💡 请在浏览器中登录天猫...")
-        print("💡 登录成功后，按回车继续...")
-        input()
-        
-        # 保存登录后的cookie
-        print("💾 保存登录状态...")
-        save_cookies()
-        time.sleep(10)
+    # 2. 使用固定字体文件（不下载新字体，避免映射错误）
+    print(f"🔤 使用固定字体文件...")
     
     # 等待页面完全加载
     print("⏳ 等待页面加载...")
     time.sleep(15)
     
-    # 滚动到底部
-    print(f"📜 滚动到底部 ({scroll_steps}步)...")
+    # 3. 逐步下拉
+    print(f"📜 逐步下拉 ({scroll_steps}次)...")
     scroll_to_bottom(scroll_steps)
     
     # 等待数据加载
     print("⏳ 等待数据加载...")
     time.sleep(10)
     
-    # 获取商品
+    # 4. 爬取页面数据
     print("🔍 获取商品...")
     products = get_products()
     
@@ -378,7 +421,6 @@ def crawl_page(url, page_name, scroll_steps=30):
     
     if not products:
         print("⚠️ 仍然无商品")
-        close_safari()
         return 0
     
     print(f"✅ 获取到 {len(products)} 个商品")
@@ -391,7 +433,7 @@ def crawl_page(url, page_name, scroll_steps=30):
     print("💾 保存Cookie...")
     save_cookies()
     
-    # 关闭Safari
+    # 5. 关闭Safari
     print("🔒 关闭Safari...")
     close_safari()
     
@@ -403,24 +445,28 @@ def main():
     print("="*60)
     print("🚀 天猫爬虫 - 3页完整版")
     print("="*60)
+    print("结构：打开Safari → 下载字体 → 下拉滚动 → 爬数据 → 关闭Safari")
+    print("="*60)
     
-    try:
-        font = TTFont(FONT_PATH)
-        font.close()
-        print("✅ 字体加载成功\n")
-    except Exception as e:
-        print(f"⚠️ 字体加载失败: {e}\n")
+    # 第1页：50步滚动
+    print("\n📄 爬取第1页（50步滚动）...")
+    new1 = crawl_one_page(PAGE1_URL, "第1页", 50)
     
-    # 爬取3页（每页间隔30秒）
-    new1 = crawl_page(PAGE1_URL, "第1页", 50)      # 50步滚动
+    # 间隔30秒
     print("\n⏳ 间隔30秒后再爬第2页...")
     time.sleep(30)
     
-    new2 = crawl_page(PAGE2_URL, "第2页", 50)      # 50步滚动
+    # 第2页：50步滚动
+    print("\n📄 爬取第2页（50步滚动）...")
+    new2 = crawl_one_page(PAGE2_URL, "第2页", 50)
+    
+    # 间隔30秒
     print("\n⏳ 间隔30秒后再爬第3页...")
     time.sleep(30)
     
-    new3 = crawl_page(PAGE3_URL, "第3页", 50)      # 50步滚动
+    # 第3页：10步滚动
+    print("\n📄 爬取第3页（10步滚动）...")
+    new3 = crawl_one_page(PAGE3_URL, "第3页", 10)
     
     # 统计
     conn = sqlite3.connect(DB_PATH)
@@ -433,12 +479,16 @@ def main():
     with_level = cursor.fetchone()[0]
     cursor.execute("SELECT COUNT(*) FROM tmall_products WHERE style_name != ''")
     with_style = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM tmall_price_history")
+    price_history_count = cursor.fetchone()[0]
     conn.close()
     
     print(f"\n" + "="*60)
     print("📊 最终统计")
     print("="*60)
-    print(f"   总商品: {total}")
+    print(f"   新增商品: {new1 + new2 + new3}")
+    print(f"   总商品数量: {total}")
+    print(f"   价格记录数量: {price_history_count}")
     print(f"   有价格: {with_price}")
     print(f"   有级别: {with_level}")
     print(f"   有款式: {with_style}")
@@ -446,6 +496,8 @@ def main():
     print(f"   第2页新增: {new2}")
     print(f"   第3页新增: {new3}")
     print("="*60)
+    
+    print("\n🎉 爬虫完成！")
 
 
 if __name__ == '__main__':

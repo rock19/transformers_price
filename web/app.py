@@ -316,14 +316,14 @@ def api_tmall_stats():
     """获取天猫统计数据（不受筛选影响）"""
     conn = get_db()
     
-    # 查询所有商品的统计数据
+    # 查询所有商品的统计数据（包括 is_purchased='否' 和 is_followed='否' 的情况）
     stats = conn.execute('''
         SELECT 
             COUNT(*) as total,
             SUM(CASE WHEN is_purchased = '购买' THEN 1 ELSE 0 END) as purchased,
-            SUM(CASE WHEN is_purchased = '未购买' THEN 1 ELSE 0 END) as not_purchased,
+            SUM(CASE WHEN is_purchased IN ('未购买', '否') THEN 1 ELSE 0 END) as not_purchased,
             SUM(CASE WHEN is_followed = '关注' THEN 1 ELSE 0 END) as followed,
-            SUM(CASE WHEN is_followed = '未关注' THEN 1 ELSE 0 END) as not_followed
+            SUM(CASE WHEN is_followed IN ('未关注', '否') THEN 1 ELSE 0 END) as not_followed
         FROM tmall_products
     ''').fetchone()
     

@@ -12,7 +12,7 @@ import re
 from datetime import datetime
 
 DB_PATH = 'data/transformers.db'
-BASE_URL = 'https://mall.jd.com/view_search-396211-17821117-{}-1-20-{}.html'
+BASE_URL = 'https://mall.jd.com/view_search-396211-17821117-99-1-20-{}.html'
 
 
 def extract_level(title):
@@ -213,7 +213,7 @@ def save_products(products, page_num):
             """, (
                 p['id'], p['url'], p['img'], p['title'][:500],
                 p['price'], p['status'],
-                "孩之宝京东自营旗舰店", BASE_URL.format('17821117', page_num),
+                "孩之宝京东自营旗舰店", BASE_URL.format(page_num),
                 style_name, level,
                 datetime.now().isoformat(), datetime.now().isoformat()
             ))
@@ -245,7 +245,7 @@ def save_products(products, page_num):
 
 
 def go_to_page(page_num):
-    url = BASE_URL.format('17821117', page_num)
+    url = BASE_URL.format(page_num)
     subprocess.run(['osascript', '-e', f'tell application "Safari" to open location "{url}"'])
     random_wait(15, 20)
 
